@@ -151,7 +151,7 @@ const MarketDashboard = ({ onStockClick }) => {
       <section className="dashboard-section popular-section">
         <h3 className="dashboard-section-title">
           <span className="section-title-icon">🔥</span>
-          Ações Populares
+          Ativos em Tempo Real
           <span className="section-subtitle">Clique para analisar</span>
         </h3>
         <div className="popular-grid">
