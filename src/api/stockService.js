@@ -1,94 +1,99 @@
 import axios from 'axios';
 
 /**
- * Serviço de dados de ações conectado em TEMPO REAL à API Gratuita (Yahoo Finance) via Proxy CORS.
+ * Serviço de dados de ações conectado em TEMPO REAL à API Oficial (Brapi)
  */
 
-// Formata tickers brasileiros para o formato reconhecido pelo Yahoo Finance (.SA)
+const BRAPI_TOKEN = 'hxjPRfTojZgRQhaWe32eDe';
+const BASE_URL = 'https://brapi.dev/api/quote/';
+
+// Mapeamento de ações globais para BDRs Brasileiros (para funcionarem na B3 via Brapi)
+const globalToBdrMap = {
+  'AAPL': 'AAPL34',
+  'MSFT': 'MSFT34',
+  'GOOGL': 'GOGL34',
+  'AMZN': 'AMZO34',
+  'TSLA': 'TSLA34',
+  'META': 'M1TA34',
+  'NVDA': 'NVDC34',
+};
+
+// Alguns dados estáticos de setor/nome para popular caso a API falhe o 'sector'
+const companyDatabase = {
+  'AAPL34': { name: 'Apple Inc.', sector: 'Tecnologia' },
+  'GOGL34': { name: 'Alphabet Inc.', sector: 'Tecnologia' },
+  'MSFT34': { name: 'Microsoft Corp.', sector: 'Tecnologia' },
+  'AMZO34': { name: 'Amazon.com Inc.', sector: 'Consumo' },
+  'TSLA34': { name: 'Tesla Inc.', sector: 'Automotivo' },
+  'M1TA34': { name: 'Meta Platforms Inc.', sector: 'Tecnologia' },
+  'NVDC34': { name: 'NVIDIA Corp.', sector: 'Tecnologia' },
+  'PETR4': { name: 'Petrobras', sector: 'Energia' },
+  'VALE3': { name: 'Vale', sector: 'Mineração' },
+  'ITUB4': { name: 'Itaú Unibanco', sector: 'Financeiro' },
+  'BBDC4': { name: 'Bradesco', sector: 'Financeiro' },
+  'ABEV3': { name: 'Ambev', sector: 'Bebidas' },
+  'WEGE3': { name: 'WEG', sector: 'Industrial' },
+  'BBAS3': { name: 'Banco do Brasil', sector: 'Financeiro' },
+};
+
+// Formata tickers para o formato reconhecido pela Brapi
 const formatSymbolForApi = (symbol) => {
-  const upper = symbol.toUpperCase().trim();
-  // Se for uma string de 4 letras seguida de 1 ou 2 números (ex: PETR4, ITUB4, TAEE11), adiciona .SA
-  if (/^[A-Z]{4}\d{1,2}$/.test(upper)) {
-    return `${upper}.SA`;
+  let upper = symbol.toUpperCase().trim();
+  // Remove eventual ".SA" que o Yahoo finance exigia
+  if (upper.endsWith('.SA')) {
+    upper = upper.replace('.SA', '');
+  }
+  // Se for uma das globais configuradas, traduz para BDR
+  if (globalToBdrMap[upper]) {
+    return globalToBdrMap[upper];
   }
   return upper;
 };
 
-// Formata o ticker de volta para exibição sem .SA
+// Formata o ticker de volta para exibição agradável
 const formatSymbolForDisplay = (symbol) => {
-  return symbol.replace('.SA', '');
-};
-
-// Alguns dados estáticos de setor/nome porque a API básica de cotação não retorna isso
-const companyDatabase = {
-  'AAPL': { name: 'Apple Inc.', sector: 'Tecnologia' },
-  'GOOGL': { name: 'Alphabet Inc.', sector: 'Tecnologia' },
-  'MSFT': { name: 'Microsoft Corp.', sector: 'Tecnologia' },
-  'AMZN': { name: 'Amazon.com Inc.', sector: 'Consumo' },
-  'TSLA': { name: 'Tesla Inc.', sector: 'Automotivo' },
-  'META': { name: 'Meta Platforms Inc.', sector: 'Tecnologia' },
-  'NVDA': { name: 'NVIDIA Corp.', sector: 'Tecnologia' },
-  'JPM': { name: 'JPMorgan Chase', sector: 'Financeiro' },
-  'PETR4.SA': { name: 'Petrobras', sector: 'Energia' },
-  'VALE3.SA': { name: 'Vale', sector: 'Mineração' },
-  'ITUB4.SA': { name: 'Itaú Unibanco', sector: 'Financeiro' },
-  'BBDC4.SA': { name: 'Bradesco', sector: 'Financeiro' },
-  'ABEV3.SA': { name: 'Ambev', sector: 'Bebidas' },
-  'WEGE3.SA': { name: 'WEG', sector: 'Industrial' },
-  'BBAS3.SA': { name: 'Banco do Brasil', sector: 'Financeiro' },
+  let display = symbol.replace('.SA', '');
+  // Converte "AAPL34" de volta para "AAPL" pro usuário não estranhar
+  const originalGlobal = Object.keys(globalToBdrMap).find(k => globalToBdrMap[k] === display);
+  if (originalGlobal) return originalGlobal;
+  return display;
 };
 
 export const fetchStockData = async (symbol) => {
   const apiSymbol = formatSymbolForApi(symbol);
   
-  // Usamos um Proxy CORS gratuito e universal para contornar bloqueios do Yahoo
-  // A URL real do Yahoo é passada dentro dele.
-  const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${apiSymbol}`;
-  const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`;
-
   try {
-    const response = await axios.get(proxyUrl);
+    const targetUrl = `${BASE_URL}${apiSymbol}?token=${BRAPI_TOKEN}`;
+    const response = await axios.get(targetUrl);
     
-    if (!response.data || !response.data.chart || !response.data.chart.result || response.data.chart.result.length === 0) {
-      throw new Error(`Dados não encontrados para o ticker ${apiSymbol}. Verifique se a ação existe.`);
+    if (!response.data || !response.data.results || response.data.results.length === 0) {
+      throw new Error(`Dados não encontrados para o ticker ${apiSymbol}.`);
     }
 
-    const result = response.data.chart.result[0];
-    const meta = result.meta;
-    
-    const currentPrice = meta.regularMarketPrice;
-    const prevClose = meta.previousClose;
-    let changePercent = 0;
-    
-    if (prevClose && prevClose > 0) {
-      changePercent = ((currentPrice - prevClose) / prevClose) * 100;
-    }
-
+    const item = response.data.results[0];
     const knownInfo = companyDatabase[apiSymbol];
 
-    // Cria o objeto com DADOS REAIS da bolsa
-    const realTimeData = {
-      symbol: formatSymbolForDisplay(meta.symbol),
-      companyName: knownInfo ? knownInfo.name : formatSymbolForDisplay(meta.symbol),
-      currentPrice: currentPrice,
-      changePercent: changePercent,
+    return {
+      symbol: formatSymbolForDisplay(item.symbol),
+      companyName: item.shortName || (knownInfo ? knownInfo.name : `${formatSymbolForDisplay(item.symbol)} Corp.`),
+      currentPrice: item.regularMarketPrice || 0,
+      changePercent: item.regularMarketChangePercent || 0,
       sector: knownInfo ? knownInfo.sector : 'Bolsa de Valores',
-      currency: meta.currency || 'USD',
-      realTime: true // FLAG indicando que agora é tempo real
+      currency: item.currency || 'BRL',
+      realTime: true // FLAG indicando que é tempo real
     };
 
-    return realTimeData;
-
   } catch (error) {
-    console.warn(`Conexão real-time bloqueada pelo proxy para ${symbol}. Ativando fallback simulado.`, error.message);
+    console.warn(`Conexão real-time falhou via Brapi para ${symbol}. Ativando fallback simulado.`, error.message);
     
+    // Fallback Simulator se a API não conhecer o ticker ou cair
     const knownInfo = companyDatabase[apiSymbol];
     const variationPercent = (Math.random() - 0.5) * 8;
     let basePrice = 150;
-    if (apiSymbol === 'PETR4.SA') basePrice = 38.50;
-    if (apiSymbol === 'VALE3.SA') basePrice = 67.20;
-    if (apiSymbol === 'AAPL') basePrice = 175.50;
-    if (apiSymbol === 'NVDA') basePrice = 880.00;
+    if (apiSymbol === 'PETR4') basePrice = 38.50;
+    if (apiSymbol === 'VALE3') basePrice = 67.20;
+    if (apiSymbol === 'AAPL34') basePrice = 175.50;
+    if (apiSymbol === 'NVDC34') basePrice = 880.00;
     if (apiSymbol === 'BRL=X') basePrice = 5.25;
 
     const simulatedPrice = basePrice * (1 + variationPercent / 100);
@@ -99,7 +104,7 @@ export const fetchStockData = async (symbol) => {
       currentPrice: simulatedPrice,
       changePercent: variationPercent,
       sector: knownInfo ? knownInfo.sector : 'Diversificado',
-      currency: apiSymbol.includes('.SA') ? 'BRL' : 'USD',
+      currency: 'BRL',
       realTime: false // Indica que é fallback
     };
   }
@@ -107,37 +112,39 @@ export const fetchStockData = async (symbol) => {
 
 // Nova função para buscar múltiplos tickets de uma vez (ideal para o Dashboard)
 export const fetchMarketOverview = async (symbolsArray) => {
-  const apiSymbols = symbolsArray.map(s => formatSymbolForApi(s)).join(',');
-  const targetUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${apiSymbols}`;
-  const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`;
+  
+  // Separar o que é índice/moeda (não rodam direto no bulk da brapi.dev quote) e o que é ação
+  const indices = ['BRL=X', '^BVSP', '^GSPC', '^IXIC', '^DJI', '^FTSE'];
+  const stockSymbolsToFetch = symbolsArray
+    .filter(s => !indices.includes(s))
+    .map(s => formatSymbolForApi(s));
+
+  const overviewData = {};
 
   try {
-    const response = await axios.get(proxyUrl);
-    const results = response.data.quoteResponse.result;
-    
-    // Converte o array em um mapa (objeto) chaveado pelo símbolo original
-    const overviewData = {};
-    results.forEach(item => {
-      // Revertendo .SA para achar a chave original
-      let originalSymbol = item.symbol;
-      if (originalSymbol.endsWith('.SA')) {
-        originalSymbol = originalSymbol.replace('.SA', '');
-      }
+    if (stockSymbolsToFetch.length > 0) {
+      const apiSymbolsStr = stockSymbolsToFetch.join(',');
+      const targetUrl = `${BASE_URL}${apiSymbolsStr}?token=${BRAPI_TOKEN}`;
       
-      overviewData[originalSymbol] = {
-        price: item.regularMarketPrice,
-        change: item.regularMarketChangePercent
-      };
-    });
-    
-    return overviewData;
+      const response = await axios.get(targetUrl);
+      const results = response.data.results || [];
+      
+      results.forEach(item => {
+        let originalSymbol = formatSymbolForDisplay(item.symbol);
+        overviewData[originalSymbol] = {
+          price: item.regularMarketPrice || 0,
+          change: item.regularMarketChangePercent || 0
+        };
+      });
+    }
   } catch (error) {
-    console.warn('Proxy bloqueou Market Overview. Gerando fallback dinâmico.', error.message);
-    
-    // Fallback inteligente para não quebrar a tela inicial 
-    const fallbackData = {};
-    symbolsArray.forEach(sym => {
-      const origSym = formatSymbolForDisplay(sym);
+    console.warn('Brapi bloqueou Market Overview das Ações. Gerando fallback...', error.message);
+  }
+
+  // Preenche via Fallback qualquer ticker/índice que falhou na busca ou que foi excluído
+  symbolsArray.forEach(sym => {
+    const origSym = formatSymbolForDisplay(sym);
+    if (!overviewData[origSym] || overviewData[origSym].price === 0) {
       const baseChange = (Math.random() - 0.5) * 5;
       let basePrice = 50 + Math.random() * 100;
       
@@ -152,12 +159,12 @@ export const fetchMarketOverview = async (symbolsArray) => {
       else if (origSym === '^IXIC') basePrice = 16892;
       else if (origSym === '^DJI') basePrice = 39475;
       
-      fallbackData[origSym] = {
+      overviewData[origSym] = {
         price: basePrice * (1 + baseChange / 100),
         change: baseChange
       };
-    });
-    
-    return fallbackData;
-  }
+    }
+  });
+
+  return overviewData;
 };
