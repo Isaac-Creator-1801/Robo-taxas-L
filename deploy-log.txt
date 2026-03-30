@@ -1,0 +1,95 @@
+﻿
+> analise-acoes-app@1.0.0 predeploy
+> npm run build
+
+
+> analise-acoes-app@1.0.0 build
+> webpack --mode production
+
+asset [1m[33mbundle.js[39m[22m [1m[33m296 KiB[39m[22m [1m[33m[compared for emit][39m[22m [1m[32m[minimized][39m[22m [1m[33m[big][39m[22m (name: main) 1 related asset
+asset [1m[32mindex.html[39m[22m 877 bytes [1m[33m[compared for emit][39m[22m
+runtime modules 1.17 KiB 6 modules
+modules by path [1m./node_modules/[39m[22m 675 KiB
+  modules by path [1m./node_modules/style-loader/dist/runtime/*.js[39m[22m 5.84 KiB 6 modules
+  modules by path [1m./node_modules/react-dom/[39m[22m 533 KiB 4 modules
+  modules by path [1m./node_modules/react/[39m[22m 17 KiB 2 modules
+  modules by path [1m./node_modules/scheduler/[39m[22m 10.1 KiB 2 modules
+  modules by path [1m./node_modules/css-loader/dist/runtime/*.js[39m[22m 2.31 KiB 2 modules
+  + 1 module
+modules by path [1m./src/[39m[22m 102 KiB
+  modules by path [1m./src/components/*.js[39m[22m 44.5 KiB 4 modules
+  modules by path [1m./src/*.js[39m[22m 4.82 KiB 2 modules
+  modules by path [1m./src/styles/*.css[39m[22m 28.2 KiB 2 modules
+  modules by path [1m./src/api/*.js[39m[22m 24.4 KiB 2 modules
+
+[1m[33mWARNING[39m[22m in [1masset size limit: The following asset(s) exceed the recommended size limit (244 KiB).
+This can impact web performance.
+Assets: 
+  bundle.js (296 KiB)[39m[22m
+
+[1m[33mWARNING[39m[22m in [1mentrypoint size limit: The following entrypoint(s) combined asset size exceeds the recommended limit (244 KiB). This can impact web performance.
+Entrypoints:
+  main (296 KiB)
+      bundle.js
+[39m[22m
+
+[1m[33mWARNING[39m[22m in [1mwebpack performance recommendations: 
+You can limit the size of your bundles by using import() or require.ensure to lazy load some parts of your application.
+For more info visit https://webpack.js.org/guides/code-splitting/[39m[22m
+
+webpack 5.105.4 compiled with [1m[33m3 warnings[39m[22m in 2493 ms
+
+> analise-acoes-app@1.0.0 deploy
+> gh-pages -d dist
+
+node.exe : node:internal/module
+s/cjs/loader:1459
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~
+    + CategoryInfo          :  
+   NotSpecified: (node:intern  
+  al/modules/cjs/loader:1459   
+ :String) [], RemoteExcepti    
+on
+    + FullyQualifiedErrorId :  
+   NativeCommandError
+ 
+  throw err;
+  ^
+
+Error: Cannot find module 
+'C:\Users\GORILLA 
+MOBILE\Documents\ROBO DEZU\anal
+ise-acoes-app\node_modules\gh-p
+ages\bin\gh-pages.js'
+    at Module._resolveFilename 
+(node:internal/modules/cjs/load
+er:1456:15)
+    at defaultResolveImpl (node
+:internal/modules/cjs/loader:10
+66:19)
+    at resolveForCJSWithHooks (
+node:internal/modules/cjs/loade
+r:1071:22)
+    at Module._load (node:inter
+nal/modules/cjs/loader:1242:25)
+    at wrapModuleLoad (node:int
+ernal/modules/cjs/loader:255:19
+)
+    at 
+Module.executeUserEntryPoint 
+[as runMain] (node:internal/mod
+ules/run_main:154:5)
+    at node:internal/main/run_m
+ain_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v24.14.1
