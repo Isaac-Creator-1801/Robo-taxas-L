@@ -1,0 +1,16 @@
+﻿asset [1m[32mbundle.js[39m[22m 1.26 MiB [1m[32m[emitted][39m[22m (name: main)
+asset [1m[32mindex.html[39m[22m 923 bytes [1m[32m[emitted][39m[22m
+runtime modules 1.07 KiB 6 modules
+cacheable modules 1.2 MiB
+  modules by path [1m./node_modules/[39m[22m 1.1 MiB
+    modules by path [1m./node_modules/style-loader/dist/runtime/*.js[39m[22m 5.84 KiB 6 modules
+    modules by path [1m./node_modules/react-dom/[39m[22m 1.04 MiB 4 modules
+    modules by path [1m./node_modules/react/[39m[22m 46.3 KiB 2 modules
+    modules by path [1m./node_modules/scheduler/[39m[22m 12 KiB 2 modules
+    modules by path [1m./node_modules/css-loader/dist/runtime/*.js[39m[22m 2.31 KiB 2 modules
+  modules by path [1m./src/[39m[22m 100 KiB
+    modules by path [1m./src/components/*.js[39m[22m 44.5 KiB 4 modules
+    modules by path [1m./src/*.js[39m[22m 4.82 KiB 2 modules
+    modules by path [1m./src/styles/*.css[39m[22m 28 KiB 2 modules
+    modules by path [1m./src/api/*.js[39m[22m 22.7 KiB 2 modules
+webpack 5.105.4 compiled [1m[32msuccessfully[39m[22m in 1007 ms
