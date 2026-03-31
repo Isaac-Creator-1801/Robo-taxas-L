@@ -73,9 +73,9 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const fetchSingleQuote = async (displaySymbol) => {
   const apiSymbol = formatSymbolForApi(displaySymbol);
   
-  // Índices estrangeiros e câmbio: a Brapi não suporta, usa fallback fixo
-  // Exceção: ^BVSP é mapeado para IBOV e suportado pela Brapi
-  const unsupportedFallback = ['^GSPC', '^IXIC', '^DJI', '^FTSE', 'BRL=X'];
+  // Câmbio e outros não suportados pela Brapi: usa fallback fixo
+  // Exceção: ^BVSP é mapeado para IBOV e suportado. ^GSPC, ^IXIC, ^DJI e ^FTSE também são suportados.
+  const unsupportedFallback = ['BRL=X'];
   if (unsupportedFallback.includes(displaySymbol)) {
     const fb = staticFallbackPrices[displaySymbol];
     return fb ? { price: fb.price, change: fb.change } : null;
