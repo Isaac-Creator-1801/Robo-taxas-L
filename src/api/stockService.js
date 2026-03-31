@@ -12,8 +12,8 @@ const globalToBdrMap = {
   'TSLA': 'TSLA34',
   'META': 'M1TA34',
   'NVDA': 'NVDC34',
-  // Mapeamento de índices para símbolos aceitos pela Brapi
-  '^BVSP': 'IBOV',
+  // Os índices abaixo são suportados diretamente com o prefixo '^'
+  // Não mapeamos mais ^BVSP para IBOV pois IBOV retorna 404 na Brapi
 };
 
 const companyDatabase = {
@@ -106,7 +106,18 @@ const fetchSingleQuote = async (displaySymbol) => {
     }
     throw new Error('Sem resultados');
   } catch (err) {
-    console.warn(`[stockService] Falha ao buscar ${apiSymbol}, tentando cache:`, err.message);
+    let errorType = 'UNKNOWN';
+    if (!navigator.onLine) {
+      errorType = 'OFFLINE';
+    } else if (err.response) {
+      // O servidor respondeu com um erro (4xx, 5xx)
+      errorType = err.response.status === 429 ? 'RATE_LIMIT' : 'API_ERROR';
+    } else if (err.request) {
+      // A requisição foi feita mas não houve resposta (timeout/conexão)
+      errorType = 'NETWORK_ERROR';
+    }
+
+    console.warn(`[stockService] Falha ao buscar ${apiSymbol} (${errorType}):`, err.message);
     
     // Tenta pegar último valor do cache
     try {
@@ -117,12 +128,13 @@ const fetchSingleQuote = async (displaySymbol) => {
           price: parsed.price, 
           change: parsed.change, 
           isCached: true, 
+          errorType,
           timestamp: parsed.timestamp 
         };
       }
     } catch (e) {}
 
-    return null;
+    return { isCached: true, errorType, price: 0, change: 0 };
   }
 };
 

@@ -62,6 +62,7 @@ const MarketDashboard = ({ onStockClick }) => {
   const [loading, setLoading] = useState(true);
   const [isUsingCache, setIsUsingCache] = useState(false);
   const [lastUpdateDate, setLastUpdateDate] = useState(null);
+  const [errorDetails, setErrorDetails] = useState({ type: null, failedAssets: [] });
 
   useEffect(() => {
     let active = true;
@@ -77,6 +78,8 @@ const MarketDashboard = ({ onStockClick }) => {
       if (realData && active) {
         let cachedUsed = false;
         let oldestTimestamp = null;
+        let failedList = [];
+        let errorType = null;
 
         // Atualiza os índices de mercado
         setIndices(fallbackIndices.map(idx => {
@@ -84,6 +87,8 @@ const MarketDashboard = ({ onStockClick }) => {
           if (data) {
             if (data.isCached) {
                cachedUsed = true;
+               failedList.push(idx.name);
+               errorType = data.errorType;
                if (data.timestamp && (!oldestTimestamp || data.timestamp < oldestTimestamp)) {
                  oldestTimestamp = data.timestamp;
                }
@@ -101,6 +106,8 @@ const MarketDashboard = ({ onStockClick }) => {
           if (data) {
             if (data.isCached) {
                cachedUsed = true;
+               failedList.push(stock.symbol);
+               errorType = data.errorType;
                if (data.timestamp && (!oldestTimestamp || data.timestamp < oldestTimestamp)) {
                  oldestTimestamp = data.timestamp;
                }
@@ -111,6 +118,7 @@ const MarketDashboard = ({ onStockClick }) => {
         });
         
         setIsUsingCache(cachedUsed);
+        setErrorDetails({ type: errorType, failedAssets: [...new Set(failedList)] });
         if (oldestTimestamp) {
           setLastUpdateDate(new Date(oldestTimestamp).toLocaleString('pt-BR'));
         }
@@ -139,6 +147,16 @@ const MarketDashboard = ({ onStockClick }) => {
     };
   }, []);
 
+  const getErrorMessage = () => {
+    switch (errorDetails.type) {
+      case 'OFFLINE': return 'Você parece estar sem conexão com a internet.';
+      case 'RATE_LIMIT': return 'A API Brapi atingiu o limite de consultas por segundo do seu plano.';
+      case 'NETWORK_ERROR': return 'Houve um erro de rede ou o servidor não respondeu.';
+      case 'API_ERROR': return 'A API de cotações retornou um erro interno (Serviço Instável).';
+      default: return 'Não foi possível sincronizar todos os dados em tempo real.';
+    }
+  };
+
   return (
     <div className={`market-dashboard ${loading ? 'opacity-50' : ''}`}>
 
@@ -146,20 +164,34 @@ const MarketDashboard = ({ onStockClick }) => {
         <div style={{
           backgroundColor: 'rgba(217, 119, 6, 0.15)',
           color: '#fcd34d',
-          padding: '12px 16px',
-          borderRadius: '8px',
-          marginBottom: '20px',
-          border: '1px solid rgba(217, 119, 6, 0.5)',
+          padding: '16px 20px',
+          borderRadius: '12px',
+          marginBottom: '28px',
+          border: '1px solid rgba(217, 119, 6, 0.4)',
           display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          fontSize: '0.95rem'
+          flexDirection: 'column',
+          gap: '8px',
+          fontSize: '0.9rem',
+          backdropFilter: 'blur(8px)'
         }}>
-          <span style={{ fontSize: '1.5rem' }}>⚠️</span>
-          <div>
-            <strong>Aviso de Conexão com API: </strong> 
-            Não foi possível obter os dados em tempo real no momento (API indisponível). 
-            Exibindo os valores salvos da sua última conexão {lastUpdateDate ? `(${lastUpdateDate})` : ''}.
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '1.4rem' }}>⚠️</span>
+            <strong style={{ fontSize: '1.0rem' }}>Diagnóstico de Conexão:</strong> 
+          </div>
+          <div style={{ marginLeft: '32px' }}>
+            <p style={{ marginBottom: '6px', opacity: 0.9 }}>{getErrorMessage()}</p>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              <strong>Buscando do Cache Para:</strong> {errorDetails.failedAssets.join(', ') || 'Todo o mercado'}.
+            </p>
+            {lastUpdateDate ? (
+              <p style={{ fontSize: '0.8rem', marginTop: '6px', color: 'var(--accent-gold)' }}>
+                 🕒 Última sincronização completa: {lastUpdateDate}
+              </p>
+            ) : (
+              <p style={{ fontSize: '0.8rem', marginTop: '6px', fontStyle: 'italic' }}>
+                * Exibindo preços de segurança (Não houve sincronização prévia neste dispositivo).
+              </p>
+            )}
           </div>
         </div>
       )}
