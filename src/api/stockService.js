@@ -32,27 +32,7 @@ const companyDatabase = {
   'WEGE3': { name: 'WEG', sector: 'Industrial' },
   'BBAS3': { name: 'Banco do Brasil', sector: 'Financeiro' },
 };
-
-// Preços de referência estáticos (usados APENAS se a API falhar)
-const staticFallbackPrices = {
-  'AAPL': { price: 178.50, change: 0.85 },
-  'MSFT': { price: 415.20, change: 2.18 },
-  'GOOGL': { price: 141.80, change: -0.85 },
-  'AMZN': { price: 185.68, change: 1.75 },
-  'NVDA': { price: 875.40, change: 4.30 },
-  'TSLA': { price: 245.30, change: -2.15 },
-  'META': { price: 505.75, change: 3.42 },
-  'PETR4': { price: 38.50, change: 1.20 },
-  'VALE3': { price: 67.20, change: -0.45 },
-  'ITUB4': { price: 34.10, change: 0.90 },
-  'BBAS3': { price: 58.20, change: 1.50 },
-  '^BVSP': { price: 182500, change: 0.53 },
-  '^GSPC': { price: 6343, change: -0.39 },
-  '^IXIC': { price: 20794, change: -0.73 },
-  '^DJI':  { price: 45216, change: 0.11 },
-  '^FTSE': { price: 10127, change: 1.61 },
-  'BRL=X': { price: 5.26, change: -0.30 },
-};
+const FX_URL = 'https://economia.awesomeapi.com.br/json/last/USD-BRL';
 
 const formatSymbolForApi = (symbol) => {
   if (!symbol) return '';
@@ -69,45 +49,80 @@ const formatSymbolForDisplay = (apiSymbol) => {
 // Delay helper
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Busca dados de UM único ativo usando a Brapi
-const fetchSingleQuote = async (displaySymbol) => {
-  const apiSymbol = formatSymbolForApi(displaySymbol);
-  
-  // Câmbio e outros não suportados pela Brapi: usa fallback fixo
-  // Exceção: ^BVSP é mapeado para IBOV e suportado. ^GSPC, ^IXIC, ^DJI e ^FTSE também são suportados.
-  const unsupportedFallback = ['BRL=X'];
-  if (unsupportedFallback.includes(displaySymbol)) {
-    const fb = staticFallbackPrices[displaySymbol];
-    return fb ? { price: fb.price, change: fb.change } : null;
+const fetchBrapiQuote = async (apiSymbol, params = '') => {
+  const url = params ? `${BASE_URL}${apiSymbol}?${params}` : `${BASE_URL}${apiSymbol}?token=${BRAPI_TOKEN}`;
+  const response = await axios.get(url, { timeout: 8000 });
+  if (response.data?.results?.length > 0) {
+    return response.data.results[0];
   }
+  throw new Error('Sem resultados');
+};
+
+const getCachedQuote = (displaySymbol, errorType) => {
+  try {
+    const cached = localStorage.getItem(`brapi_cache_${displaySymbol}`);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      return {
+        price: parsed.price,
+        change: parsed.change,
+        isCached: true,
+        errorType,
+        timestamp: parsed.timestamp
+      };
+    }
+  } catch (e) {}
+  return null;
+};
+
+// Busca dados de UM único ativo usando a Brapi
+export const fetchSingleQuote = async (displaySymbol) => {
+  const apiSymbol = formatSymbolForApi(displaySymbol);
 
   try {
-    const response = await axios.get(`${BASE_URL}${apiSymbol}?token=${BRAPI_TOKEN}`, {
-      timeout: 8000,
-    });
+    if (displaySymbol === 'BRL=X') {
+      const fxResponse = await axios.get(FX_URL, { timeout: 8000 });
+      const fx = fxResponse.data?.USDBRL;
+      const price = Number(fx?.bid);
+      const change = Number(fx?.pctChange);
+      if (Number.isFinite(price)) {
+        const resultData = {
+          price,
+          change: Number.isFinite(change) ? change : 0,
+          isCached: false,
+          source: 'awesomeapi'
+        };
+        try {
+          localStorage.setItem(`brapi_cache_${displaySymbol}`, JSON.stringify({
+            ...resultData,
+            timestamp: Date.now()
+          }));
+        } catch (e) {}
+        return resultData;
+      }
+      throw new Error('Sem resultados');
+    }
 
-    if (response.data?.results?.length > 0) {
-      const item = response.data.results[0];
-      const resultData = {
-        price: item.regularMarketPrice || 0,
-        change: item.regularMarketChangePercent || 0,
-        isCached: false
-      };
-      
-      // Salva no localStorage a última atualização real
+    const item = await fetchBrapiQuote(apiSymbol);
+    const resultData = {
+      price: item.regularMarketPrice,
+      change: item.regularMarketChangePercent,
+      isCached: false
+    };
+
+    if (Number.isFinite(resultData.price)) {
       try {
         localStorage.setItem(`brapi_cache_${displaySymbol}`, JSON.stringify({
           ...resultData,
           timestamp: Date.now()
         }));
       } catch (e) {}
-      
       return resultData;
     }
     throw new Error('Sem resultados');
   } catch (err) {
     let errorType = 'UNKNOWN';
-    if (!navigator.onLine) {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
       errorType = 'OFFLINE';
     } else if (err.response) {
       // O servidor respondeu com um erro (4xx, 5xx)
@@ -119,23 +134,21 @@ const fetchSingleQuote = async (displaySymbol) => {
 
     console.warn(`[stockService] Falha ao buscar ${apiSymbol} (${errorType}):`, err.message);
     
-    // Tenta pegar último valor do cache
-    try {
-      const cached = localStorage.getItem(`brapi_cache_${displaySymbol}`);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        return { 
-          price: parsed.price, 
-          change: parsed.change, 
-          isCached: true, 
-          errorType,
-          timestamp: parsed.timestamp 
-        };
-      }
-    } catch (e) {}
+    const cached = getCachedQuote(displaySymbol, errorType);
+    if (cached) return cached;
 
-    return { isCached: true, errorType, price: 0, change: 0 };
+    return null;
   }
+};
+
+export const fetchQuoteDetails = async (symbol, options = {}) => {
+  const apiSymbol = formatSymbolForApi(symbol);
+  const params = new URLSearchParams({ token: BRAPI_TOKEN });
+  if (options.range) params.append('range', options.range);
+  if (options.interval) params.append('interval', options.interval);
+  if (options.fundamental) params.append('fundamental', 'true');
+
+  return fetchBrapiQuote(apiSymbol, params.toString());
 };
 
 // Busca dados completos de um ativo para a tela de análise
@@ -144,40 +157,24 @@ export const fetchStockData = async (symbol) => {
   const knownInfo = companyDatabase[apiSymbol] || {};
 
   try {
-    const response = await axios.get(`${BASE_URL}${apiSymbol}?token=${BRAPI_TOKEN}`, {
-      timeout: 8000,
-    });
-
-    if (response.data?.results?.length > 0) {
-      const item = response.data.results[0];
-      return {
-        symbol: formatSymbolForDisplay(item.symbol || apiSymbol),
-        companyName: item.shortName || knownInfo.name || `${formatSymbolForDisplay(apiSymbol)} Corp.`,
-        currentPrice: item.regularMarketPrice || 0,
-        changePercent: item.regularMarketChangePercent || 0,
-        sector: knownInfo.sector || 'Diversos',
-        currency: item.currency || 'BRL',
-        realTime: true,
-      };
-    }
-    throw new Error('Sem resultados');
-  } catch (error) {
-    console.warn(`[stockService] fetchStockData fallback para ${symbol}`);
-    const fb = staticFallbackPrices[symbol] || { price: 50, change: 0 };
+    const item = await fetchQuoteDetails(symbol);
     return {
-      symbol: formatSymbolForDisplay(apiSymbol),
-      companyName: knownInfo.name || `${formatSymbolForDisplay(apiSymbol)} Corp.`,
-      currentPrice: fb.price,
-      changePercent: fb.change,
-      sector: knownInfo.sector || 'Diversos',
-      currency: 'BRL',
-      realTime: false,
+      symbol: formatSymbolForDisplay(item.symbol || apiSymbol),
+      companyName: item.shortName || knownInfo.name || `${formatSymbolForDisplay(apiSymbol)} Corp.`,
+      currentPrice: item.regularMarketPrice,
+      changePercent: item.regularMarketChangePercent,
+      sector: item.sector || knownInfo.sector || 'Diversos',
+      currency: item.currency || 'BRL',
+      realTime: true,
     };
+  } catch (error) {
+    console.warn(`[stockService] fetchStockData erro para ${symbol}`);
+    throw error;
   }
 };
 
 // Busca dados do painel: um ativo de cada vez com delay de 300ms entre cada
-// Isso respeita o Rate Limit do plano gratuito da Brapi (1 símbolo por request)
+// Isso respeita o limite público da Brapi (1 símbolo por request)
 export const fetchMarketOverview = async (symbolsArray) => {
   const overviewData = {};
 
@@ -185,12 +182,6 @@ export const fetchMarketOverview = async (symbolsArray) => {
     const data = await fetchSingleQuote(sym);
     if (data && data.price > 0) {
       overviewData[sym] = data;
-    } else {
-      // Usa fallback fixo APENAS se a API falhou e o usuário NUNCA acessou antes (sem cache)
-      const fb = staticFallbackPrices[sym];
-      if (fb) {
-        overviewData[sym] = { price: fb.price, change: fb.change, isCached: true };
-      }
     }
     // 300ms de pausa entre cada request para não estourar o limite
     await delay(300);

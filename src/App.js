@@ -3,15 +3,20 @@ import StockTicker from './components/StockTicker';
 import SearchBar from './components/SearchBar';
 import StockAnalysis from './components/StockAnalysis';
 import MarketDashboard from './components/MarketDashboard';
+import { logSearch } from './api/searchHistoryService';
+
 
 function App() {
   const [selectedStock, setSelectedStock] = useState('');
 
   const handleStockSelect = (symbol) => {
     setSelectedStock(symbol);
+    // Registrar a pesquisa no Supabase
+    logSearch(symbol);
     // Scroll suave para o topo da análise
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
 
   return (
     <div className="App">

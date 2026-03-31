@@ -1,56 +1,57 @@
 import React, { useState, useEffect } from 'react';
 import { fetchMarketOverview } from '../api/stockService';
+import { getTopSearches } from '../api/searchHistoryService';
 
 const fallbackIndices = [
-  { symbol: '^BVSP', name: 'IBOVESPA', value: '...', change: 0, icon: '🇧🇷' },
-  { symbol: '^GSPC', name: 'S&P 500', value: '...', change: 0, icon: '🇺🇸' },
-  { symbol: '^IXIC', name: 'NASDAQ', value: '...', change: 0, icon: '💻' },
-  { symbol: '^DJI', name: 'DOW JONES', value: '...', change: 0, icon: '🏛️' },
-  { symbol: '^FTSE', name: 'FTSE 100', value: '...', change: 0, icon: '🇬🇧' },
-  { symbol: 'BRL=X', name: 'Dólar/Real', value: 'R$ ...', change: 0, icon: '💵' },
+  { symbol: '^BVSP', name: 'IBOVESPA', value: '...', change: null, icon: '🇧🇷' },
+  { symbol: '^GSPC', name: 'S&P 500', value: '...', change: null, icon: '🇺🇸' },
+  { symbol: '^IXIC', name: 'NASDAQ', value: '...', change: null, icon: '💻' },
+  { symbol: '^DJI', name: 'DOW JONES', value: '...', change: null, icon: '🏛️' },
+  { symbol: '^FTSE', name: 'FTSE 100', value: '...', change: null, icon: '🇬🇧' },
+  { symbol: 'BRL=X', name: 'Dólar/Real', value: 'R$ ...', change: null, icon: '💵' },
 ];
 
 const fallbackPopularStocks = [
-  { symbol: 'AAPL', name: 'Apple', price: 0, change: 0, sector: 'Tecnologia' },
-  { symbol: 'PETR4', name: 'Petrobras', price: 0, change: 0, sector: 'Energia' },
-  { symbol: 'VALE3', name: 'Vale', price: 0, change: 0, sector: 'Mineração' },
-  { symbol: 'NVDA', name: 'NVIDIA', price: 0, change: 0, sector: 'Tecnologia' },
-  { symbol: 'ITUB4', name: 'Itaú', price: 0, change: 0, sector: 'Financeiro' },
-  { symbol: 'MSFT', name: 'Microsoft', price: 0, change: 0, sector: 'Tecnologia' },
-  { symbol: 'TSLA', name: 'Tesla', price: 0, change: 0, sector: 'Automotivo' },
-  { symbol: 'BBAS3', name: 'Banco do Brasil', price: 0, change: 0, sector: 'Financeiro' },
+  { symbol: 'AAPL', name: 'Apple', price: null, change: null, sector: 'Tecnologia' },
+  { symbol: 'PETR4', name: 'Petrobras', price: null, change: null, sector: 'Energia' },
+  { symbol: 'VALE3', name: 'Vale', price: null, change: null, sector: 'Mineração' },
+  { symbol: 'NVDA', name: 'NVIDIA', price: null, change: null, sector: 'Tecnologia' },
+  { symbol: 'ITUB4', name: 'Itaú', price: null, change: null, sector: 'Financeiro' },
+  { symbol: 'MSFT', name: 'Microsoft', price: null, change: null, sector: 'Tecnologia' },
+  { symbol: 'TSLA', name: 'Tesla', price: null, change: null, sector: 'Automotivo' },
+  { symbol: 'BBAS3', name: 'Banco do Brasil', price: null, change: null, sector: 'Financeiro' },
 ];
 
 const features = [
   {
     icon: '📊',
     title: 'Análise Técnica',
-    desc: 'RSI, MACD, Médias Móveis e tendências em tempo real'
+    desc: 'RSI, MACD, médias móveis e tendências com dados históricos reais'
   },
   {
     icon: '📈',
     title: 'Análise Fundamentalista',
-    desc: 'P/L, P/VP, ROE, Dividend Yield e margens de lucro'
+    desc: 'P/L, P/VP, ROE, Dividend Yield e margens com fontes públicas'
   },
   {
-    icon: '🔮',
-    title: 'Previsões de Preço',
-    desc: 'Cenários otimista, base e pessimista para curto/médio/longo prazo'
+    icon: '🎯',
+    title: 'Score de Compra',
+    desc: 'Score 0-100 baseado em fundamentos, técnico, risco, insiders e sentimento'
   },
   {
-    icon: '🌍',
-    title: 'Contexto Global',
-    desc: 'Impacto de relações internacionais e fatores macroeconômicos'
+    icon: '🧭',
+    title: 'Movimentação de Insiders',
+    desc: 'Compras e vendas oficiais com preço médio e saldo líquido'
   },
   {
     icon: '⚡',
     title: 'Avaliação de Risco',
-    desc: 'Score de risco detalhado baseado em 6 fatores-chave'
+    desc: 'Risco baseado em volatilidade, drawdown e endividamento real'
   },
   {
     icon: '📰',
     title: 'Notícias em Tempo Real',
-    desc: 'Notícias recentes clicáveis com análise de sentimento'
+    desc: 'Notícias recentes com sentimento calculado automaticamente'
   },
 ];
 
@@ -63,12 +64,12 @@ const MarketDashboard = ({ onStockClick }) => {
   const [isUsingCache, setIsUsingCache] = useState(false);
   const [lastUpdateDate, setLastUpdateDate] = useState(null);
   const [errorDetails, setErrorDetails] = useState({ type: null, failedAssets: [] });
+  const [topSearches, setTopSearches] = useState([]);
 
   useEffect(() => {
     let active = true;
 
     const loadRealtimeDashboard = async () => {
-      // 1. Busca os índices (BRL=X, ^BVSP...)
       const idxSymbols = fallbackIndices.map(i => i.symbol);
       const popSymbols = fallbackPopularStocks.map(p => p.symbol);
       const allSymbols = [...idxSymbols, ...popSymbols];
@@ -81,7 +82,6 @@ const MarketDashboard = ({ onStockClick }) => {
         let failedList = [];
         let errorType = null;
 
-        // Atualiza os índices de mercado
         setIndices(fallbackIndices.map(idx => {
           const data = realData[idx.symbol];
           if (data) {
@@ -100,7 +100,6 @@ const MarketDashboard = ({ onStockClick }) => {
           return idx;
         }));
 
-        // Atualiza ações populares
         const updatedPopular = fallbackPopularStocks.map(stock => {
           const data = realData[stock.symbol];
           if (data) {
@@ -125,21 +124,29 @@ const MarketDashboard = ({ onStockClick }) => {
 
         setPopular(updatedPopular);
 
-        // Sort para gainers/losers baseado na list popular (top 5 de cada)
-        const sortedDesc = [...updatedPopular].sort((a,b) => b.change - a.change);
+        const filteredByChange = updatedPopular.filter((item) => Number.isFinite(item.change));
+        const sortedDesc = [...filteredByChange].sort((a, b) => b.change - a.change);
         setGainers(sortedDesc.slice(0, 5));
         
-        const sortedAsc = [...updatedPopular].sort((a,b) => a.change - b.change);
+        const sortedAsc = [...filteredByChange].sort((a, b) => a.change - b.change);
         setLosers(sortedAsc.slice(0, 5));
       }
 
       if (active) setLoading(false);
     };
 
+    const loadTrends = async () => {
+      const trends = await getTopSearches(5);
+      if (active) setTopSearches(trends);
+    };
+
     loadRealtimeDashboard();
+    loadTrends();
     
-    // Atualiza a cada 5 minutos
-    const intervalId = setInterval(loadRealtimeDashboard, 5 * 60 * 1000);
+    const intervalId = setInterval(() => {
+      loadRealtimeDashboard();
+      loadTrends();
+    }, 5 * 60 * 1000);
 
     return () => {
       active = false;
@@ -150,7 +157,7 @@ const MarketDashboard = ({ onStockClick }) => {
   const getErrorMessage = () => {
     switch (errorDetails.type) {
       case 'OFFLINE': return 'Você parece estar sem conexão com a internet.';
-      case 'RATE_LIMIT': return 'A API Brapi atingiu o limite de consultas por segundo do seu plano.';
+      case 'RATE_LIMIT': return 'A API de cotações atingiu o limite público de consultas.';
       case 'NETWORK_ERROR': return 'Houve um erro de rede ou o servidor não respondeu.';
       case 'API_ERROR': return 'A API de cotações retornou um erro interno (Serviço Instável).';
       default: return 'Não foi possível sincronizar todos os dados em tempo real.';
@@ -189,11 +196,35 @@ const MarketDashboard = ({ onStockClick }) => {
               </p>
             ) : (
               <p style={{ fontSize: '0.8rem', marginTop: '6px', fontStyle: 'italic' }}>
-                * Exibindo preços de segurança (Não houve sincronização prévia neste dispositivo).
+                * Sem dados anteriores no cache deste dispositivo.
               </p>
             )}
           </div>
         </div>
+      )}
+
+      {/* Top Pesquisas (Trendings) */}
+      {topSearches.length > 0 && (
+        <section className="dashboard-section trends-section">
+          <h3 className="dashboard-section-title">
+            <span className="section-title-icon">🔥</span>
+            Tendências da Comunidade
+            <span className="section-subtitle">Ações mais investigadas hoje</span>
+          </h3>
+          <div className="trends-grid">
+            {topSearches.map((item, index) => (
+              <div 
+                key={item.symbol} 
+                className="trend-tag"
+                onClick={() => onStockClick(item.symbol)}
+              >
+                <span className="trend-rank">#{index + 1}</span>
+                <span className="trend-symbol">{item.symbol}</span>
+                <span className="trend-count">{item.count} buscas</span>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* Índices de Mercado */}
@@ -215,8 +246,10 @@ const MarketDashboard = ({ onStockClick }) => {
                 <span className="index-name">{idx.name}</span>
               </div>
               <div className="index-value">{idx.value}</div>
-              <div className={`index-change ${idx.change >= 0 ? 'positive' : 'negative'}`}>
-                {idx.change >= 0 ? '▲' : '▼'} {Math.abs(idx.change).toFixed(2)}%
+              <div className={`index-change ${Number.isFinite(idx.change) ? (idx.change >= 0 ? 'positive' : 'negative') : 'neutral'}`}>
+                {Number.isFinite(idx.change)
+                  ? `${idx.change >= 0 ? '▲' : '▼'} ${Math.abs(idx.change).toFixed(2)}%`
+                  : '—'}
               </div>
             </div>
           ))}
@@ -239,12 +272,16 @@ const MarketDashboard = ({ onStockClick }) => {
             >
               <div className="popular-card-top">
                 <div className="popular-symbol">{stock.symbol}</div>
-                <span className={`popular-change ${stock.change >= 0 ? 'positive' : 'negative'}`}>
-                  {stock.change >= 0 ? '▲' : '▼'} {Math.abs(stock.change).toFixed(2)}%
+                <span className={`popular-change ${Number.isFinite(stock.change) ? (stock.change >= 0 ? 'positive' : 'negative') : 'neutral'}`}>
+                  {Number.isFinite(stock.change)
+                    ? `${stock.change >= 0 ? '▲' : '▼'} ${Math.abs(stock.change).toFixed(2)}%`
+                    : '—'}
                 </span>
               </div>
               <div className="popular-name">{stock.name}</div>
-              <div className="popular-price">${stock.price.toFixed(2)}</div>
+              <div className="popular-price">
+                {Number.isFinite(stock.price) ? `$${stock.price.toFixed(2)}` : '—'}
+              </div>
               <div className="popular-sector">{stock.sector}</div>
             </div>
           ))}
@@ -321,7 +358,7 @@ const MarketDashboard = ({ onStockClick }) => {
 
       {/* Disclaimer */}
       <div className="dashboard-disclaimer">
-        <p>⚠️ <strong>Aviso Legal:</strong> As cotações são baseadas em dados de mercado reais (atraso de até 15 min), mas as análises técnicas e previsões do Robô das Taxas são algorítmicas e apenas para fins informativos. Não constituem aconselhamento ou recomendação oficial de investimento.</p>
+        <p>⚠️ <strong>Aviso Legal:</strong> As cotações são baseadas em dados de mercado reais (atraso de até 15 min), e as análises são calculadas a partir de fontes públicas gratuitas e dados históricos. Não constituem aconselhamento ou recomendação oficial de investimento.</p>
       </div>
     </div>
   );
