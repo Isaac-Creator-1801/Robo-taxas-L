@@ -88,14 +88,40 @@ const fetchSingleQuote = async (displaySymbol) => {
 
     if (response.data?.results?.length > 0) {
       const item = response.data.results[0];
-      return {
+      const resultData = {
         price: item.regularMarketPrice || 0,
         change: item.regularMarketChangePercent || 0,
+        isCached: false
       };
+      
+      // Salva no localStorage a última atualização real
+      try {
+        localStorage.setItem(`brapi_cache_${displaySymbol}`, JSON.stringify({
+          ...resultData,
+          timestamp: Date.now()
+        }));
+      } catch (e) {}
+      
+      return resultData;
     }
-    return null;
+    throw new Error('Sem resultados');
   } catch (err) {
-    console.warn(`[stockService] Falha ao buscar ${apiSymbol}:`, err.message);
+    console.warn(`[stockService] Falha ao buscar ${apiSymbol}, tentando cache:`, err.message);
+    
+    // Tenta pegar último valor do cache
+    try {
+      const cached = localStorage.getItem(`brapi_cache_${displaySymbol}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return { 
+          price: parsed.price, 
+          change: parsed.change, 
+          isCached: true, 
+          timestamp: parsed.timestamp 
+        };
+      }
+    } catch (e) {}
+
     return null;
   }
 };
@@ -148,10 +174,10 @@ export const fetchMarketOverview = async (symbolsArray) => {
     if (data && data.price > 0) {
       overviewData[sym] = data;
     } else {
-      // Usa fallback fixo se API falhou
+      // Usa fallback fixo APENAS se a API falhou e o usuário NUNCA acessou antes (sem cache)
       const fb = staticFallbackPrices[sym];
       if (fb) {
-        overviewData[sym] = { price: fb.price, change: fb.change };
+        overviewData[sym] = { price: fb.price, change: fb.change, isCached: true };
       }
     }
     // 300ms de pausa entre cada request para não estourar o limite

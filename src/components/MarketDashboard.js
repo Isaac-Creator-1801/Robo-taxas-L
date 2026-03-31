@@ -60,6 +60,8 @@ const MarketDashboard = ({ onStockClick }) => {
   const [gainers, setGainers] = useState([]);
   const [losers, setLosers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isUsingCache, setIsUsingCache] = useState(false);
+  const [lastUpdateDate, setLastUpdateDate] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -73,10 +75,19 @@ const MarketDashboard = ({ onStockClick }) => {
       const realData = await fetchMarketOverview(allSymbols);
 
       if (realData && active) {
+        let cachedUsed = false;
+        let oldestTimestamp = null;
+
         // Atualiza os índices de mercado
         setIndices(fallbackIndices.map(idx => {
           const data = realData[idx.symbol];
           if (data) {
+            if (data.isCached) {
+               cachedUsed = true;
+               if (data.timestamp && (!oldestTimestamp || data.timestamp < oldestTimestamp)) {
+                 oldestTimestamp = data.timestamp;
+               }
+            }
             let valStr = data.price.toFixed(2);
             if (idx.symbol === 'BRL=X') valStr = `R$ ${valStr}`;
             return { ...idx, value: valStr, change: data.change };
@@ -88,11 +99,22 @@ const MarketDashboard = ({ onStockClick }) => {
         const updatedPopular = fallbackPopularStocks.map(stock => {
           const data = realData[stock.symbol];
           if (data) {
+            if (data.isCached) {
+               cachedUsed = true;
+               if (data.timestamp && (!oldestTimestamp || data.timestamp < oldestTimestamp)) {
+                 oldestTimestamp = data.timestamp;
+               }
+            }
             return { ...stock, price: data.price, change: data.change };
           }
           return stock;
         });
         
+        setIsUsingCache(cachedUsed);
+        if (oldestTimestamp) {
+          setLastUpdateDate(new Date(oldestTimestamp).toLocaleString('pt-BR'));
+        }
+
         setPopular(updatedPopular);
 
         // Sort para gainers/losers baseado na list popular (top 5 de cada)
@@ -119,6 +141,28 @@ const MarketDashboard = ({ onStockClick }) => {
 
   return (
     <div className={`market-dashboard ${loading ? 'opacity-50' : ''}`}>
+
+      {isUsingCache && !loading && (
+        <div style={{
+          backgroundColor: 'rgba(217, 119, 6, 0.15)',
+          color: '#fcd34d',
+          padding: '12px 16px',
+          borderRadius: '8px',
+          marginBottom: '20px',
+          border: '1px solid rgba(217, 119, 6, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          fontSize: '0.95rem'
+        }}>
+          <span style={{ fontSize: '1.5rem' }}>⚠️</span>
+          <div>
+            <strong>Aviso de Conexão com API: </strong> 
+            Não foi possível obter os dados em tempo real no momento (API indisponível). 
+            Exibindo os valores salvos da sua última conexão {lastUpdateDate ? `(${lastUpdateDate})` : ''}.
+          </div>
+        </div>
+      )}
 
       {/* Índices de Mercado */}
       <section className="dashboard-section indices-section">
