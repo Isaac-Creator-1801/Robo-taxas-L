@@ -2,74 +2,97 @@ import { fetchStockData, fetchQuoteDetails, fetchSingleQuote } from './stockServ
 import { fetchInsiderActivity } from './insiderService';
 import { fetchRecentNews } from './newsService';
 
+const FALLBACK_INSIDER = {
+  status: 'unavailable',
+  windowMonths: 6,
+  netShares: 0,
+  netValue: 0,
+  buyShares: 0,
+  sellShares: 0,
+  buyValue: 0,
+  sellValue: 0,
+  avgBuyPrice: null,
+  avgSellPrice: null,
+  signal: 'neutro',
+  signalKey: 'neutral',
+  score: 50,
+  lastReportedDate: null,
+  sourceUrl: null,
+  rows: [],
+  message: 'Dados de insiders indisponíveis.'
+};
+
 /**
  * Serviço de análise de mercado avançado
  * Consolida dados reais de mercado, fundamentos e notícias
  */
 export const analyzeStock = async (symbol) => {
-  try {
-    // Busca dados básicos da ação
-    const basicData = await fetchStockData(symbol);
+  // Busca dados básicos da ação (obrigatório)
+  const basicData = await fetchStockData(symbol);
+  const resolvedSymbol = basicData.symbol || symbol;
 
-    const resolvedSymbol = basicData.symbol || symbol;
-    const [quoteDetails, insiderActivity, recentNews] = await Promise.all([
-      fetchQuoteDetails(resolvedSymbol, { range: '1y', interval: '1d', fundamental: true }),
-      fetchInsiderActivity(resolvedSymbol, { windowMonths: 6 }),
-      fetchRecentNews({ symbol: resolvedSymbol, companyName: basicData.companyName, limit: 4 })
-    ]);
+  // Busca dados complementares em paralelo com fallbacks
+  const [quoteDetails, insiderActivity, recentNews] = await Promise.all([
+    fetchQuoteDetails(resolvedSymbol, { fundamental: true })
+      .catch(() => fetchQuoteDetails(resolvedSymbol))
+      .catch(() => ({})),
+    fetchInsiderActivity(resolvedSymbol, { windowMonths: 6 })
+      .catch(() => FALLBACK_INSIDER),
+    fetchRecentNews({ symbol: resolvedSymbol, companyName: basicData.companyName, limit: 4 })
+      .catch(() => [])
+  ]);
 
-    const historicalData = normalizeHistoricalData(quoteDetails);
-    const technicalAnalysis = calculateTechnicalAnalysis(historicalData, basicData.currentPrice);
-    const fundamentalAnalysis = calculateFundamentalAnalysis(quoteDetails);
-    const riskAssessment = calculateRiskAssessment(historicalData, fundamentalAnalysis);
-    const sectorAnalysis = await calculateSectorAnalysis({
-      sectorName: basicData.sector,
-      symbol: resolvedSymbol,
-      currency: basicData.currency,
-      quoteDetails
-    });
-    const internationalRelations = null;
-    const pricePredictions = null;
-    const upcomingEvents = [];
-    const buyScoreDetails = calculateBuyScore({
-      technicalAnalysis,
+  const historicalData = normalizeHistoricalData(quoteDetails);
+  const technicalAnalysis = calculateTechnicalAnalysis(historicalData, basicData.currentPrice);
+  const fundamentalAnalysis = calculateFundamentalAnalysis(quoteDetails);
+  const riskAssessment = calculateRiskAssessment(historicalData, fundamentalAnalysis);
+
+  const sectorAnalysis = await calculateSectorAnalysis({
+    sectorName: basicData.sector,
+    symbol: resolvedSymbol,
+    currency: basicData.currency,
+    quoteDetails
+  }).catch(() => ({
+    sector: basicData.sector || 'Diversos',
+    sectorPerformance: null,
+    sectorTrend: 'indefinido',
+    summary: 'Dados setoriais indisponíveis.',
+    sourceSymbol: null
+  }));
+
+  const buyScoreDetails = calculateBuyScore({
+    technicalAnalysis,
+    fundamentalAnalysis,
+    riskAssessment,
+    insiderActivity,
+    recentNews,
+    sectorAnalysis
+  });
+
+  return {
+    ...basicData,
+    technicalAnalysis,
+    fundamentalAnalysis,
+    internationalRelations: null,
+    sectorAnalysis,
+    pricePredictions: null,
+    riskAssessment,
+    insiderActivity,
+    recentNews,
+    upcomingEvents: [],
+    recommendation: getRecommendationFromScore(buyScoreDetails.score),
+    confidenceScore: calculateConfidenceScore({
       fundamentalAnalysis,
+      technicalAnalysis,
       riskAssessment,
       insiderActivity,
       recentNews,
       sectorAnalysis
-    });
-    
-    const analysis = {
-      ...basicData,
-      technicalAnalysis,
-      fundamentalAnalysis,
-      internationalRelations,
-      sectorAnalysis,
-      pricePredictions,
-      riskAssessment,
-      insiderActivity,
-      recentNews,
-      upcomingEvents,
-      recommendation: getRecommendationFromScore(buyScoreDetails.score),
-      confidenceScore: calculateConfidenceScore({
-        fundamentalAnalysis,
-        technicalAnalysis,
-        riskAssessment,
-        insiderActivity,
-        recentNews,
-        sectorAnalysis
-      }),
-      buyScore: buyScoreDetails.score,
-      buyScoreLabel: buyScoreDetails.label,
-      buyScoreBreakdown: buyScoreDetails.breakdown
-    };
-    
-    return analysis;
-  } catch (error) {
-    console.error('Erro na análise avançada:', error);
-    throw error;
-  }
+    }),
+    buyScore: buyScoreDetails.score,
+    buyScoreLabel: buyScoreDetails.label,
+    buyScoreBreakdown: buyScoreDetails.breakdown
+  };
 };
 const clampValue = (value, min, max) => Math.min(max, Math.max(min, value));
 

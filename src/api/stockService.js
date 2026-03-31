@@ -144,11 +144,21 @@ export const fetchSingleQuote = async (displaySymbol) => {
 export const fetchQuoteDetails = async (symbol, options = {}) => {
   const apiSymbol = formatSymbolForApi(symbol);
   const params = new URLSearchParams({ token: BRAPI_TOKEN });
-  if (options.range) params.append('range', options.range);
-  if (options.interval) params.append('interval', options.interval);
+  
+  // Parâmetros básicos que funcionam no plano gratuito
   if (options.fundamental) params.append('fundamental', 'true');
-
-  return fetchBrapiQuote(apiSymbol, params.toString());
+  
+  // Tentar com parâmetros primeiro
+  try {
+    return await fetchBrapiQuote(apiSymbol, params.toString());
+  } catch (error) {
+    // Se falhar, tentar sem parâmetros extras (plano gratuito básico)
+    if (error.response?.status === 400) {
+      console.warn(`[stockService] Parâmetros extras rejeitados para ${apiSymbol}, usando plano básico`);
+      return await fetchBrapiQuote(apiSymbol);
+    }
+    throw error;
+  }
 };
 
 // Busca dados completos de um ativo para a tela de análise
@@ -156,21 +166,35 @@ export const fetchStockData = async (symbol) => {
   const apiSymbol = formatSymbolForApi(symbol);
   const knownInfo = companyDatabase[apiSymbol] || {};
 
-  try {
-    const item = await fetchQuoteDetails(symbol);
-    return {
-      symbol: formatSymbolForDisplay(item.symbol || apiSymbol),
-      companyName: item.shortName || knownInfo.name || `${formatSymbolForDisplay(apiSymbol)} Corp.`,
-      currentPrice: item.regularMarketPrice,
-      changePercent: item.regularMarketChangePercent,
-      sector: item.sector || knownInfo.sector || 'Diversos',
-      currency: item.currency || 'BRL',
-      realTime: true,
-    };
-  } catch (error) {
-    console.warn(`[stockService] fetchStockData erro para ${symbol}`);
-    throw error;
+  // Tentar múltiplas abordagens para buscar dados
+  const attempts = [
+    () => fetchQuoteDetails(symbol, { fundamental: true }),
+    () => fetchQuoteDetails(symbol),
+    () => fetchBrapiQuote(apiSymbol)
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      const item = await attempt();
+      if (item && (item.regularMarketPrice || item.regularMarketPrice === 0)) {
+        return {
+          symbol: formatSymbolForDisplay(item.symbol || apiSymbol),
+          companyName: item.shortName || knownInfo.name || `${formatSymbolForDisplay(apiSymbol)} Corp.`,
+          currentPrice: item.regularMarketPrice,
+          changePercent: item.regularMarketChangePercent || 0,
+          sector: item.sector || knownInfo.sector || 'Diversos',
+          currency: item.currency || 'BRL',
+          realTime: true,
+        };
+      }
+    } catch (error) {
+      // Continuar para próxima tentativa
+      continue;
+    }
   }
+
+  console.warn(`[stockService] fetchStockData erro para ${symbol}: todas as tentativas falharam`);
+  throw new Error(`Não foi possível buscar dados para ${symbol}`);
 };
 
 // Busca dados do painel: um ativo de cada vez com delay de 300ms entre cada
