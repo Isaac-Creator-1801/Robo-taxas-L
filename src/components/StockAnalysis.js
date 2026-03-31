@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { analyzeStock } from '../api/marketAnalysisService';
+import ValuationCalculator from './ValuationCalculator';
 
 const StockAnalysis = ({ stockSymbol }) => {
   const [data, setData] = useState(null);
@@ -68,6 +69,9 @@ const StockAnalysis = ({ stockSymbol }) => {
           {changeSymbol} Variação: {formatNumber(data.changePercent)}%
         </p>
       </div>
+
+      {/* Calculadora de Valuation Mágica */}
+      <ValuationCalculator currentPrice={data.currentPrice} symbol={data.symbol || stockSymbol} />
 
       {/* Analysis Sections */}
       <div className="analysis-sections">
