@@ -112,6 +112,9 @@ export const TICKER_DATABASE = [
   { ticker: 'VAMO3', name: 'Vamos', sector: 'Logística' },
   { ticker: 'VULC3', name: 'Vulcabras', sector: 'Vestuário' },
   { ticker: 'ZAMP3', name: 'Zamp (Burger King)', sector: 'Consumo' },
+  { ticker: 'SOJA3', name: 'Boa Safra Sementes', sector: 'Agronegócio' },
+  { ticker: 'AGRO3', name: 'BrasilAgro', sector: 'Agronegócio' },
+  { ticker: 'LAND3', name: 'Terra Santa', sector: 'Agronegócio' },
 
   // INTERNACIONAIS (USA)
   { ticker: 'AAPL', name: 'Apple Inc.', sector: 'Tecnologia' },
