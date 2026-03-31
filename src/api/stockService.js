@@ -3,6 +3,7 @@ import axios from 'axios';
 const BRAPI_TOKEN = 'hxjPRfTojZgRQhaWe32eDe';
 const BASE_URL = 'https://brapi.dev/api/quote/';
 
+// Mapeamento de ações globais para BDRs na B3
 const globalToBdrMap = {
   'AAPL': 'AAPL34',
   'MSFT': 'MSFT34',
@@ -11,6 +12,8 @@ const globalToBdrMap = {
   'TSLA': 'TSLA34',
   'META': 'M1TA34',
   'NVDA': 'NVDC34',
+  // Mapeamento de índices para símbolos aceitos pela Brapi
+  '^BVSP': 'IBOV',
 };
 
 const companyDatabase = {
@@ -30,96 +33,130 @@ const companyDatabase = {
   'BBAS3': { name: 'Banco do Brasil', sector: 'Financeiro' },
 };
 
+// Preços de referência estáticos (usados APENAS se a API falhar)
+const staticFallbackPrices = {
+  'AAPL': { price: 178.50, change: 0.85 },
+  'MSFT': { price: 415.20, change: 2.18 },
+  'GOOGL': { price: 141.80, change: -0.85 },
+  'AMZN': { price: 185.68, change: 1.75 },
+  'NVDA': { price: 875.40, change: 4.30 },
+  'TSLA': { price: 245.30, change: -2.15 },
+  'META': { price: 505.75, change: 3.42 },
+  'PETR4': { price: 38.50, change: 1.20 },
+  'VALE3': { price: 67.20, change: -0.45 },
+  'ITUB4': { price: 34.10, change: 0.90 },
+  'BBAS3': { price: 58.20, change: 1.50 },
+  '^BVSP': { price: 182500, change: 0.53 },
+  '^GSPC': { price: 5230, change: 0.55 },
+  '^IXIC': { price: 16892, change: 0.80 },
+  '^DJI': { price: 39475, change: 0.40 },
+  '^FTSE': { price: 7820, change: -0.25 },
+  'BRL=X': { price: 5.26, change: -0.30 },
+};
+
 const formatSymbolForApi = (symbol) => {
   if (!symbol) return '';
-  let upper = String(symbol).toUpperCase().trim();
-  if (upper.endsWith('.SA')) upper = upper.replace('.SA', '');
-  if (globalToBdrMap[upper]) return globalToBdrMap[upper];
-  return upper;
+  let upper = String(symbol).toUpperCase().trim().replace('.SA', '');
+  return globalToBdrMap[upper] || upper;
 };
 
-const formatSymbolForDisplay = (symbol) => {
-  if (!symbol) return '';
-  let display = String(symbol).replace('.SA', '');
-  const originalGlobal = Object.keys(globalToBdrMap).find(k => globalToBdrMap[k] === display);
-  if (originalGlobal) return originalGlobal;
-  return display;
+const formatSymbolForDisplay = (apiSymbol) => {
+  const upper = String(apiSymbol).replace('.SA', '');
+  const originalGlobal = Object.keys(globalToBdrMap).find(k => globalToBdrMap[k] === upper);
+  return originalGlobal || upper;
 };
 
-// SIMULADOR DE DADOS RESILIENTE (Gera valores realistas matemáticos)
-const generateSimulatedData = (symbol) => {
-  const origSym = formatSymbolForDisplay(symbol);
-  const baseChange = (Math.random() - 0.5) * 5; // Variacao entre -2.5% e +2.5%
-  let basePrice = 50 + Math.random() * 100;
+// Delay helper
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Busca dados de UM único ativo usando a Brapi
+const fetchSingleQuote = async (displaySymbol) => {
+  const apiSymbol = formatSymbolForApi(displaySymbol);
   
-  if (origSym === 'BRL=X') basePrice = 5.26;
-  else if (origSym === 'PETR4') basePrice = 38.50;
-  else if (origSym === 'VALE3') basePrice = 67.20;
-  else if (origSym === 'AAPL') basePrice = 178.50;
-  else if (origSym === 'MSFT') basePrice = 415.20;
-  else if (origSym === 'NVDA') basePrice = 875.40;
-  else if (origSym === 'ITUB4') basePrice = 34.10;
-  else if (origSym === 'TSLA') basePrice = 175.40;
-  else if (origSym === 'BBAS3') basePrice = 58.20;
-  else if (origSym === '^BVSP') basePrice = 128450;
-  else if (origSym === '^GSPC') basePrice = 5230;
-  else if (origSym === '^IXIC') basePrice = 16892;
-  else if (origSym === '^DJI') basePrice = 39475;
+  // Índices estrangeiros e câmbio: a Brapi não suporta, usa fallback fixo
+  // Exceção: ^BVSP é mapeado para IBOV e suportado pela Brapi
+  const unsupportedFallback = ['^GSPC', '^IXIC', '^DJI', '^FTSE', 'BRL=X'];
+  if (unsupportedFallback.includes(displaySymbol)) {
+    const fb = staticFallbackPrices[displaySymbol];
+    return fb ? { price: fb.price, change: fb.change } : null;
+  }
 
-  const currentPrice = basePrice * (1 + baseChange / 100);
+  try {
+    const response = await axios.get(`${BASE_URL}${apiSymbol}?token=${BRAPI_TOKEN}`, {
+      timeout: 8000,
+    });
 
-  return {
-    price: currentPrice || 10.00,
-    change: baseChange || 0.00
-  };
+    if (response.data?.results?.length > 0) {
+      const item = response.data.results[0];
+      return {
+        price: item.regularMarketPrice || 0,
+        change: item.regularMarketChangePercent || 0,
+      };
+    }
+    return null;
+  } catch (err) {
+    console.warn(`[stockService] Falha ao buscar ${apiSymbol}:`, err.message);
+    return null;
+  }
 };
 
+// Busca dados completos de um ativo para a tela de análise
 export const fetchStockData = async (symbol) => {
   const apiSymbol = formatSymbolForApi(symbol);
+  const knownInfo = companyDatabase[apiSymbol] || {};
+
   try {
-    const targetUrl = `${BASE_URL}${apiSymbol}?token=${BRAPI_TOKEN}`;
-    const response = await axios.get(targetUrl);
-    
-    if (!response.data || !response.data.results || response.data.results.length === 0) {
-      throw new Error(`Dados não encontrados.`);
+    const response = await axios.get(`${BASE_URL}${apiSymbol}?token=${BRAPI_TOKEN}`, {
+      timeout: 8000,
+    });
+
+    if (response.data?.results?.length > 0) {
+      const item = response.data.results[0];
+      return {
+        symbol: formatSymbolForDisplay(item.symbol || apiSymbol),
+        companyName: item.shortName || knownInfo.name || `${formatSymbolForDisplay(apiSymbol)} Corp.`,
+        currentPrice: item.regularMarketPrice || 0,
+        changePercent: item.regularMarketChangePercent || 0,
+        sector: knownInfo.sector || 'Diversos',
+        currency: item.currency || 'BRL',
+        realTime: true,
+      };
     }
-
-    const item = response.data.results[0];
-    const knownInfo = companyDatabase[apiSymbol];
-
-    return {
-      symbol: formatSymbolForDisplay(item.symbol || apiSymbol),
-      companyName: item.shortName || (knownInfo ? knownInfo.name : `${formatSymbolForDisplay(apiSymbol)} Corp.`),
-      currentPrice: item.regularMarketPrice || generateSimulatedData(apiSymbol).price,
-      changePercent: item.regularMarketChangePercent || 0,
-      sector: knownInfo ? knownInfo.sector : 'Bolsa de Valores',
-      currency: item.currency || 'BRL',
-      realTime: true
-    };
+    throw new Error('Sem resultados');
   } catch (error) {
-    console.warn(`Fallback simulado para ${symbol}`);
-    const sim = generateSimulatedData(symbol);
-    const knownInfo = companyDatabase[apiSymbol];
-    
+    console.warn(`[stockService] fetchStockData fallback para ${symbol}`);
+    const fb = staticFallbackPrices[symbol] || { price: 50, change: 0 };
     return {
       symbol: formatSymbolForDisplay(apiSymbol),
-      companyName: knownInfo ? knownInfo.name : `${formatSymbolForDisplay(apiSymbol)} Corp.`,
-      currentPrice: sim.price,
-      changePercent: sim.change,
-      sector: knownInfo ? knownInfo.sector : 'Diversificado',
+      companyName: knownInfo.name || `${formatSymbolForDisplay(apiSymbol)} Corp.`,
+      currentPrice: fb.price,
+      changePercent: fb.change,
+      sector: knownInfo.sector || 'Diversos',
       currency: 'BRL',
-      realTime: false
+      realTime: false,
     };
   }
 };
 
+// Busca dados do painel: um ativo de cada vez com delay de 300ms entre cada
+// Isso respeita o Rate Limit do plano gratuito da Brapi (1 símbolo por request)
 export const fetchMarketOverview = async (symbolsArray) => {
   const overviewData = {};
 
-  // Força o preenchimento inicial SIMULADO para GARANTIR que nunca retorne vazio.
-  symbolsArray.forEach(sym => {
-    overviewData[sym] = generateSimulatedData(sym);
-  });
+  for (const sym of symbolsArray) {
+    const data = await fetchSingleQuote(sym);
+    if (data && data.price > 0) {
+      overviewData[sym] = data;
+    } else {
+      // Usa fallback fixo se API falhou
+      const fb = staticFallbackPrices[sym];
+      if (fb) {
+        overviewData[sym] = { price: fb.price, change: fb.change };
+      }
+    }
+    // 300ms de pausa entre cada request para não estourar o limite
+    await delay(300);
+  }
 
-  return overviewData; // Desativando Brapi batch para evitar erro 400 (QUOTES_PER_REQUEST_EXCEEDED) e congelamento de tela!
+  return overviewData;
 };
