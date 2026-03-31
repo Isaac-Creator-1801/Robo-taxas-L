@@ -47,10 +47,10 @@ const staticFallbackPrices = {
   'ITUB4': { price: 34.10, change: 0.90 },
   'BBAS3': { price: 58.20, change: 1.50 },
   '^BVSP': { price: 182500, change: 0.53 },
-  '^GSPC': { price: 5230, change: 0.55 },
-  '^IXIC': { price: 16892, change: 0.80 },
-  '^DJI': { price: 39475, change: 0.40 },
-  '^FTSE': { price: 7820, change: -0.25 },
+  '^GSPC': { price: 6343, change: -0.39 },
+  '^IXIC': { price: 20794, change: -0.73 },
+  '^DJI':  { price: 45216, change: 0.11 },
+  '^FTSE': { price: 10127, change: 1.61 },
   'BRL=X': { price: 5.26, change: -0.30 },
 };
 
