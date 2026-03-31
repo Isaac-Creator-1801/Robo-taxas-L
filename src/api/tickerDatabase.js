@@ -6,13 +6,13 @@
 
 export const TICKER_DATABASE = [
   // BRASILEIRAS (B3)
-  { ticker: 'PETR4', name: 'Petrobras PN', sector: 'Energia' },
-  { ticker: 'PETR3', name: 'Petrobras ON', sector: 'Energia' },
-  { ticker: 'VALE3', name: 'Vale', sector: 'Mineração' },
-  { ticker: 'ITUB4', name: 'Itaú Unibanco', sector: 'Financeiro' },
-  { ticker: 'BBDC4', name: 'Bradesco PN', sector: 'Financeiro' },
-  { ticker: 'BBDC3', name: 'Bradesco ON', sector: 'Financeiro' },
-  { ticker: 'BBAS3', name: 'Banco do Brasil', sector: 'Financeiro' },
+  { ticker: 'PETR4', name: 'Petróleo Brasileiro S.A. - Petrobras', sector: 'Energia' },
+  { ticker: 'PETR3', name: 'Petróleo Brasileiro S.A. - Petrobras', sector: 'Energia' },
+  { ticker: 'VALE3', name: 'Vale S.A.', sector: 'Mineração' },
+  { ticker: 'ITUB4', name: 'Itaú Unibanco Holding S.A.', sector: 'Financeiro' },
+  { ticker: 'BBDC4', name: 'Banco Bradesco S.A.', sector: 'Financeiro' },
+  { ticker: 'BBDC3', name: 'Banco Bradesco S.A.', sector: 'Financeiro' },
+  { ticker: 'BBAS3', name: 'Banco do Brasil S.A.', sector: 'Financeiro' },
   { ticker: 'ABEV3', name: 'Ambev', sector: 'Bebidas' },
   { ticker: 'WEGE3', name: 'WEG', sector: 'Industrial' },
   { ticker: 'MGLU3', name: 'Magazine Luiza (Magalu)', sector: 'Varejo' },
@@ -112,8 +112,8 @@ export const TICKER_DATABASE = [
   { ticker: 'VAMO3', name: 'Vamos', sector: 'Logística' },
   { ticker: 'VULC3', name: 'Vulcabras', sector: 'Vestuário' },
   { ticker: 'ZAMP3', name: 'Zamp (Burger King)', sector: 'Consumo' },
-  { ticker: 'SOJA3', name: 'Boa Safra Sementes', sector: 'Agronegócio' },
-  { ticker: 'AGRO3', name: 'BrasilAgro', sector: 'Agronegócio' },
+  { ticker: 'SOJA3', name: 'Boa Safra Sementes S.A.', sector: 'Agronegócio' },
+  { ticker: 'AGRO3', name: 'BrasilAgro - Cia Bras de Propriedades Agrícolas', sector: 'Agronegócio' },
   { ticker: 'LAND3', name: 'Terra Santa', sector: 'Agronegócio' },
 
   // INTERNACIONAIS (USA)
