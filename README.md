@@ -1,6 +1,6 @@
 # Análise de Ações - Expert Financeiro
 
-Uma aplicação web responsiva para análise de ações do mercado financeiro com expertise simulada de analista com 50+ anos de experiência.
+Uma aplicação web responsiva para análise de ações do mercado financeiro com expertise de analista.
 
 ## Funcionalidades
 
