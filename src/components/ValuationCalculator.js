@@ -177,8 +177,8 @@ const ValuationCalculator = ({ currentPrice, symbol, fundamentalData }) => {
             <span style={{ display: 'block', fontSize: '11px', color: '#888', textTransform: 'uppercase', marginBottom: '5px' }}>Potencial</span>
             {data.valid ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <span style={{ fontSize: '20px', fontWeight: 'bold', color: title === 'Peter Lynch' ? data.statusColor : (data.upside >= 0 ? '#00ff88' : '#f43f5e') }}>
-                  {title === 'Peter Lynch' ? data.status.split(' ')[0] : `${Math.abs(data.upside).toFixed(1)}%`}
+                <span style={{ fontSize: '20px', fontWeight: 'bold', color: title === 'Peter Lynch' ? (data.statusColor || '#ccc') : (data.upside >= 0 ? '#00ff88' : '#f43f5e') }}>
+                  {title === 'Peter Lynch' ? (data.status?.split(' ')[0] || '---') : `${Math.abs(data.upside || 0).toFixed(1)}%`}
                 </span>
                 <span style={{ fontSize: '10px', color: title === 'Peter Lynch' ? data.statusColor : (data.upside >= 0 ? '#00ff88' : '#f43f5e'), marginTop: '2px' }}>
                   {title === 'Peter Lynch' ? 'SINAL' : (data.upside >= 0 ? '▲ DESCONTO' : '▼ CARO')}
