@@ -2,8 +2,8 @@ import axios from 'axios';
 
 // LISTA DE TOKENS PARA RODÍZIO (Agora com 2 motores ativos!)
 const BRAPI_TOKENS = [
-  process.env.BRAPI_TOKEN_1 || 'r8N4A9mQ9g2Z6uS3v7X5yT', // Chave Principal (Exemplo/Antiga)
-  'd44vFrMJmPojkusuaRy7ye', // NOVA CHAVE ADICIONADA (Token 2)
+  't1xE6KvqetMJDws4rpHcLt', // Chave Principal (Nova)
+  'd44vFrMJmPojkusuaRy7ye', // Token 2
   process.env.BRAPI_TOKEN_2,
   process.env.BRAPI_TOKEN_3
 ].filter(t => t && t !== 'undefined'); // Remove nulos ou strings inválidas
