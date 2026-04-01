@@ -27,28 +27,46 @@ const StockChart = ({ symbol }) => {
         setLoading(true);
         setError(null);
         
-        const currentRangeConfigs = ranges.find(r => r.value === range);
-        const data = await fetchChartData(symbol, range, currentRangeConfigs.interval);
+        const currentRangeData = ranges.find(r => r.value === range);
+        const data = await fetchChartData(symbol, range, currentRangeData.interval);
         
         if (!isMounted) return;
 
         if (!data.historicalDataPrice || data.historicalDataPrice.length === 0) {
-          throw new Error('Dados históricos não disponíveis para este período.');
+          throw new Error('Sem histórico disponível.');
         }
 
-        // Formatar dados para o Google Charts usando Objetos Date para melhor escala
-        const formatted = [[{ type: 'date', label: 'Data' }, 'Preço']];
+        // Formatar dados (FORMATO SIMPLIFICADO: APENAS STRINGS E NÚMEROS)
+        const rows = [['Data', 'Preço']];
         
         data.historicalDataPrice.forEach(point => {
-          const date = new Date(point.date * 1000);
-          formatted.push([date, point.close]);
+          if (!point || point.date === null || point.close === null) return;
+          
+          try {
+            const d = new Date(point.date * 1000);
+            if (isNaN(d.getTime())) return;
+
+            let label = '';
+            if (range === '1d') {
+              label = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+            } else if (range === '5d' || range === '1mo') {
+              label = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+            } else {
+              label = `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear().toString().slice(-2)}`;
+            }
+            
+            rows.push([label, Number(point.close.toFixed(2))]);
+          } catch (e) {
+            console.warn('[StockChart] Ponto ignorado');
+          }
         });
 
-        setChartData(formatted);
+        if (rows.length <= 1) throw new Error('Dados indisponíveis');
+
+        setChartData(rows);
         setStats({
-          price: data.regularMarketPrice,
-          prevClose: data.regularMarketPreviousClose,
-          currency: data.currency
+          currency: data.currency || 'BRL',
+          prevClose: data.regularMarketPreviousClose || (rows.length > 1 ? rows[1][1] : 0)
         });
       } catch (err) {
         if (isMounted) setError(err.message);
@@ -57,9 +75,7 @@ const StockChart = ({ symbol }) => {
       }
     };
 
-    if (symbol) {
-      loadData();
-    }
+    if (symbol) loadData();
     return () => { isMounted = false; };
   }, [symbol, range]);
 
@@ -71,31 +87,26 @@ const StockChart = ({ symbol }) => {
       textStyle: { color: '#888', fontSize: 10 },
       gridlines: { color: 'transparent' },
       baselineColor: 'transparent',
-      format: range === '1d' ? 'HH:mm' : range === '5d' ? 'dd/MM HH:mm' : 'dd/MM/yy',
+      textPosition: 'out'
     },
     vAxis: {
       textStyle: { color: '#888', fontSize: 10 },
       gridlines: { color: 'rgba(255,255,255,0.05)' },
       baselineColor: 'rgba(255,255,255,0.1)',
-      format: 'currency',
+      format: 'decimal'
     },
     chartArea: { width: '90%', height: '80%', top: 20, bottom: 40 },
     legend: { position: 'none' },
+    focusTarget: 'category', // FAZ O TOOLTIP SEGUIR O MOUSE HORIZONTALMENTE
     tooltip: { 
-      isHtml: true,
-      trigger: 'both'
-    },
-    crosshair: {
       trigger: 'both',
-      orientation: 'vertical',
-      color: '#888',
-      opacity: 0.5
+      isHtml: true
     },
-    explorer: {
-      actions: ['dragToZoom', 'rightClickToReset'],
-      axis: 'horizontal',
-      keepInBounds: true,
-      maxZoomIn: 4.0
+    crosshair: { 
+      trigger: 'both', 
+      orientation: 'vertical',
+      color: '#10b981', 
+      opacity: 0.5 
     }
   };
 
@@ -119,22 +130,20 @@ const StockChart = ({ symbol }) => {
         {loading ? (
           <div className="chart-loader">
             <div className="spinner-small"></div>
-            <span>Carregando dados...</span>
+            <span>Carregando...</span>
           </div>
         ) : error ? (
           <div className="chart-error">
             <span>⚠️ {error}</span>
-            <button onClick={() => setRange('1mo')} className="retry-btn">Ver 1 Mês</button>
           </div>
         ) : (
           <Chart
-            key={`${symbol}-${range}`} // Forçar re-montagem ao trocar períodos
+            key={`chart-${symbol}-${range}-${chartData.length}`}
             chartType="AreaChart"
             width="100%"
             height="350px"
             data={chartData}
             options={options}
-            loader={<div className="chart-loader"><div className="spinner-small"></div></div>}
           />
         )}
       </div>

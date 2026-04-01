@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { analyzeStock } from '../api/marketAnalysisService';
 import ValuationCalculator from './ValuationCalculator';
 import StockChart from './StockChart';
+import '../styles/fundamentals.css';
 
 const StockAnalysis = ({ stockSymbol }) => {
   const [data, setData] = useState(null);
@@ -41,12 +42,12 @@ const StockAnalysis = ({ stockSymbol }) => {
   if (!data) return <div className="no-data">Nenhum dado disponível para esta ação.</div>;
 
   const formatNumber = (num, decimals = 2) => {
-    if (num === null || num === undefined || Number.isNaN(num)) return 'N/A';
-    return num.toFixed(decimals);
+    if (num === null || num === undefined || Number.isNaN(num)) return 'Não encontrado';
+    return num.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   };
 
   const formatInteger = (num) => {
-    if (num === null || num === undefined || Number.isNaN(num)) return 'N/A';
+    if (num === null || num === undefined || Number.isNaN(num)) return 'Não encontrado';
     return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(num);
   };
 
@@ -58,7 +59,7 @@ const StockAnalysis = ({ stockSymbol }) => {
   };
 
   const formatCurrency = (num, currency = 'BRL') => {
-    if (num === null || num === undefined || Number.isNaN(num)) return 'N/A';
+    if (num === null || num === undefined || Number.isNaN(num)) return 'Não encontrado';
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(num);
   };
 
@@ -148,7 +149,12 @@ const StockAnalysis = ({ stockSymbol }) => {
       <StockChart symbol={data.symbol || stockSymbol} />
 
       {/* Calculadora de Valuation Mágica */}
-      <ValuationCalculator currentPrice={data.currentPrice} symbol={data.symbol || stockSymbol} />
+      <ValuationCalculator 
+        key={data.symbol || stockSymbol}
+        currentPrice={data.currentPrice} 
+        symbol={data.symbol || stockSymbol} 
+        fundamentalData={data.fundamentalAnalysis}
+      />
 
       {/* Analysis Sections */}
       <div className="analysis-sections">
@@ -188,23 +194,50 @@ const StockAnalysis = ({ stockSymbol }) => {
         {/* Análise Técnica */}
         <section className="technical-analysis">
           <h3><span className="section-icon">📊</span> Análise Técnica</h3>
-          <p><strong>Tendência:</strong> {data.technicalAnalysis?.trend || 'N/A'}</p>
-          <p><strong>RSI:</strong> <span className="data-value">{formatNumber(data.technicalAnalysis?.rsi, 1)}</span></p>
-          <p><strong>MACD:</strong> <span className="data-value">{formatNumber(data.technicalAnalysis?.macd, 3)}</span></p>
+          <p><strong>Tendência:</strong> <span className={`data-value ${getPolarityClass(data.technicalAnalysis?.trend.includes('alta') ? 1 : data.technicalAnalysis?.trend.includes('baixa') ? -1 : 0)}`}>{data.technicalAnalysis?.trend || 'N/A'}</span></p>
+          <p><strong>RSI:</strong> <span className={`data-value ${data.technicalAnalysis?.rsi > 70 ? 'negative' : data.technicalAnalysis?.rsi < 30 ? 'positive' : 'neutral'}`}>{formatNumber(data.technicalAnalysis?.rsi, 1)}</span></p>
+          <p><strong>MACD:</strong> <span className={`data-value ${getPolarityClass(data.technicalAnalysis?.macd)}`}>{formatNumber(data.technicalAnalysis?.macd, 3)}</span></p>
           <p><strong>Suporte:</strong> <span className="data-value">${formatNumber(data.technicalAnalysis?.supportLevel)}</span></p>
           <p><strong>Resistência:</strong> <span className="data-value">${formatNumber(data.technicalAnalysis?.resistanceLevel)}</span></p>
-          <p><strong>Volume:</strong> {data.technicalAnalysis?.volumeTrend || 'N/A'}</p>
+          <p><strong>Volume:</strong> <span className={`data-value ${data.technicalAnalysis?.volumeTrend === 'acumulando' ? 'positive' : data.technicalAnalysis?.volumeTrend === 'distribuindo' ? 'negative' : 'neutral'}`}>{data.technicalAnalysis?.volumeTrend || 'N/A'}</span></p>
         </section>
 
         {/* Análise Fundamentalista */}
         <section className="fundamental-analysis">
           <h3><span className="section-icon">📈</span> Análise Fundamentalista</h3>
-          <p><strong>P/L:</strong> <span className="data-value">{formatNumber(data.fundamentalAnalysis?.peRatio)}</span></p>
-          <p><strong>P/VP:</strong> <span className="data-value">{formatNumber(data.fundamentalAnalysis?.pbRatio)}</span></p>
-          <p><strong>Dividend Yield:</strong> <span className="data-value">{formatNumber(data.fundamentalAnalysis?.dividendYield)}%</span></p>
-          <p><strong>ROE:</strong> <span className="data-value">{formatNumber(data.fundamentalAnalysis?.roe)}%</span></p>
-          <p><strong>Margem Líquida:</strong> <span className="data-value">{formatNumber(data.fundamentalAnalysis?.profitMargin)}%</span></p>
-          <p><strong>Cresc. Receita:</strong> <span className="data-value">{formatNumber(data.fundamentalAnalysis?.revenueGrowth)}%</span></p>
+          <div className="fundamental-grid-header">
+             <span>Indicador</span>
+             <span>Atual</span>
+             <span className="media-label">Média (5a)</span>
+          </div>
+          <div className="fundamental-row">
+            <span className="label">P/L:</span>
+            <span className="data-value">{formatNumber(data.fundamentalAnalysis?.peRatio)}</span>
+            <span className="media-value">{data.fundamentalAnalysis?.averages?.avgPe ? formatNumber(data.fundamentalAnalysis.averages.avgPe) : 'Não encontrado'}</span>
+          </div>
+          <div className="fundamental-row">
+            <span className="label">P/VP:</span>
+            <span className="data-value">{formatNumber(data.fundamentalAnalysis?.pbRatio)}</span>
+            <span className="media-value">{data.fundamentalAnalysis?.averages?.avgPb ? formatNumber(data.fundamentalAnalysis.averages.avgPb) : 'Não encontrado'}</span>
+          </div>
+          <div className="fundamental-row">
+            <span className="label">Div. Yield:</span>
+            <span className="data-value">{data.fundamentalAnalysis?.dividendYield ? `${formatNumber(data.fundamentalAnalysis.dividendYield * 100, 2)}%` : 'Não encontrado'}</span>
+            <span className="media-value">{data.fundamentalAnalysis?.averages?.avgDy ? `${formatNumber(data.fundamentalAnalysis.averages.avgDy * 100, 2)}%` : 'Não encontrado'}</span>
+          </div>
+          <div className="fundamental-row">
+            <span className="label">ROE:</span>
+            <span className="data-value">{data.fundamentalAnalysis?.roe ? `${formatNumber(data.fundamentalAnalysis.roe * 100, 2)}%` : 'Não encontrado'}</span>
+            <span className="media-value">{data.fundamentalAnalysis?.averages?.avgRoe ? `${formatNumber(data.fundamentalAnalysis.averages.avgRoe * 100, 2)}%` : 'Não encontrado'}</span>
+          </div>
+          <div className="fundamental-row-simple">
+            <span className="label">Margem Líquida:</span>
+            <span className="data-value">{formatNumber(data.fundamentalAnalysis?.profitMargin)}%</span>
+          </div>
+          <div className="fundamental-row-simple">
+            <span className="label">Cresc. Receita:</span>
+            <span className="data-value">{formatNumber(data.fundamentalAnalysis?.revenueGrowth)}%</span>
+          </div>
         </section>
 
         {/* Movimento de Insiders */}
@@ -300,65 +333,37 @@ const StockAnalysis = ({ stockSymbol }) => {
           </p>
         </section>
 
-        {/* Relações Internacionais */}
-        <section className="international-relations">
-          <h3><span className="section-icon">🌍</span> Relações Internacionais</h3>
-          {!data.internationalRelations ? (
-            <p className="section-empty">Dados macro internacionais indisponíveis com fonte pública confiável.</p>
-          ) : (
-            <>
-              <p><strong>Impacto:</strong> {data.internationalRelations?.impact || 'N/A'}</p>
-              <p><strong>Severidade:</strong> <span className="data-value">{formatNumber(data.internationalRelations?.severity, 1)}/10</span></p>
-              <p><strong>Fatores:</strong></p>
-              <ul style={{ listStyle: 'none', padding: 0 }}>
-                {data.internationalRelations?.keyFactors?.map((factor, i) => (
-                  <li key={i} style={{ padding: '4px 0', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-                    • {factor}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </section>
+        {/* Price Predictions */}
 
         {/* Previsões de Preço */}
         <section className="price-predictions">
           <h3><span className="section-icon">🔮</span> Previsões de Preço</h3>
-          {!data.pricePredictions ? (
+          {!data.pricePredictions || data.pricePredictions.status !== 'ok' ? (
             <p className="section-empty">Projeções desativadas até haver dados reais suficientes.</p>
           ) : (
-            <>
-              <p><strong>Curto prazo:</strong> <span className="data-value">${formatNumber(data.pricePredictions?.shortTerm?.target)}</span>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '6px' }}>
-                  ({formatNumber(data.pricePredictions?.shortTerm?.probability, 0)}% prob.)
+            <div className="prediction-content-box">
+              <div className="prediction-main">
+                <span className="prediction-label">Faixa Estimada (30 dias):</span>
+                <span className="prediction-range-value highlighting">
+                  {data.pricePredictions.rangeLabel}
                 </span>
-              </p>
-              <p><strong>Médio prazo:</strong> <span className="data-value">${formatNumber(data.pricePredictions?.mediumTerm?.target)}</span>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '6px' }}>
-                  ({formatNumber(data.pricePredictions?.mediumTerm?.probability, 0)}% prob.)
-                </span>
-              </p>
-              <p><strong>Longo prazo:</strong> <span className="data-value">${formatNumber(data.pricePredictions?.longTerm?.target)}</span>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '6px' }}>
-                  ({formatNumber(data.pricePredictions?.longTerm?.probability, 0)}% prob.)
-                </span>
-              </p>
-              <div className="scenarios">
-                <h4>Cenários</h4>
-                <div className="scenario-row bullish">
-                  <span className="scenario-label">🟢 Otimista</span>
-                  <span className="scenario-value">${formatNumber(data.pricePredictions?.scenarios?.bullish)}</span>
+              </div>
+              <div className="prediction-details-grid">
+                <div className="prediction-detail">
+                  <span className="detail-label">Confiança:</span>
+                  <span className="detail-value">{data.pricePredictions.confidence}%</span>
                 </div>
-                <div className="scenario-row base">
-                  <span className="scenario-label">🟡 Base</span>
-                  <span className="scenario-value">${formatNumber(data.pricePredictions?.scenarios?.base)}</span>
-                </div>
-                <div className="scenario-row bearish">
-                  <span className="scenario-label">🔴 Pessimista</span>
-                  <span className="scenario-value">${formatNumber(data.pricePredictions?.scenarios?.bearish)}</span>
+                <div className="prediction-detail">
+                  <span className="detail-label">Viés de Tendência:</span>
+                  <span className={`detail-value trend-${data.pricePredictions.trend.replace(' ', '-')}`}>
+                    {data.pricePredictions.trend}
+                  </span>
                 </div>
               </div>
-            </>
+              <p className="prediction-disclaimer">
+                * Estimativa baseada em volatilidade histórica (1 DP) e tendências técnicas atuais.
+              </p>
+            </div>
           )}
         </section>
 
@@ -385,51 +390,80 @@ const StockAnalysis = ({ stockSymbol }) => {
           </div>
         </section>
 
+        {/* Relações Internacionais */}
+        <section className="international-relations">
+          <h3><span className="section-icon">🌎</span> Relações Internacionais</h3>
+          {!data.internationalRelations || data.internationalRelations.status !== 'ok' ? (
+            <p className="section-empty">Dados macro internacionais indisponíveis no momento.</p>
+          ) : (
+            <div className="macro-container">
+              <div className="macro-grid">
+                <div className="macro-card">
+                  <div className="macro-header">
+                    <span className="macro-icon">🇺🇸</span>
+                    <span className="macro-label">S&P 500 (EUA)</span>
+                  </div>
+                  <div className="macro-content">
+                    <span className={`macro-value ${data.internationalRelations.sp500?.changePercent >= 0 ? 'bullish' : 'bearish'}`}>
+                      {data.internationalRelations.sp500?.price?.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+                    </span>
+                    <span className={`macro-badge ${data.internationalRelations.sp500?.changePercent >= 0 ? 'up' : 'down'}`}>
+                      {data.internationalRelations.sp500?.changePercent >= 0 ? '▲' : '▼'} {Math.abs(data.internationalRelations.sp500?.changePercent || 0).toFixed(2)}%
+                    </span>
+                  </div>
+                </div>
+                <div className="macro-card">
+                  <div className="macro-header">
+                    <span className="macro-icon">💵</span>
+                    <span className="macro-label">Dólar (USD/BRL)</span>
+                  </div>
+                  <div className="macro-content">
+                    <span className={`macro-value ${data.internationalRelations.dollar?.changePercent > 0 ? 'bearish' : 'bullish'}`}>
+                      R$ {data.internationalRelations.dollar?.price?.toFixed(2)}
+                    </span>
+                    <span className={`macro-badge ${data.internationalRelations.dollar?.changePercent > 0 ? 'up-danger' : 'down-success'}`}>
+                      {data.internationalRelations.dollar?.changePercent > 0 ? '▲' : '▼'} {Math.abs(data.internationalRelations.dollar?.changePercent || 0).toFixed(2)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="macro-summary-box">
+                <p>{data.internationalRelations.summary}</p>
+              </div>
+            </div>
+          )}
+        </section>
+
         {/* Notícias e Eventos */}
         <section className="news-events">
           <h3><span className="section-icon">📰</span> Notícias Recentes</h3>
-          {data.recentNews?.length ? (
-            <ul>
-              {data.recentNews?.map((news, index) => (
+          {data.recentNews && data.recentNews.length > 0 ? (
+            <div className="news-list">
+              {data.recentNews.map((news, index) => (
                 <a
                   key={index}
                   href={news.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`news-item ${news.sentiment}`}
-                  title="Clique para ver notícia completa"
+                  className="news-card"
                 >
-                  <div className="news-item-header">
-                    <span className="news-item-title">{news.title}</span>
-                    <span className="news-link-icon">🔗</span>
-                  </div>
-                  <div className="news-item-meta">
-                    <span className="news-date">{news.source} • {news.date}</span>
-                    <span className={`sentiment ${news.sentiment}`}>{news.sentiment}</span>
+                  <div className="news-content">
+                    <h4 className="news-title">{news.title}</h4>
+                    <div className="news-meta">
+                      <span className="news-source-tag"><span className="dot"></span> {news.source}</span>
+                      <span className="news-time">{news.date}</span>
+                      <span className={`news-sentiment-pill ${news.sentiment}`}>
+                        {news.sentiment === 'positivo' ? '↑ Positivo' : news.sentiment === 'negativo' ? '↓ Negativo' : '• Neutro'}
+                      </span>
+                    </div>
                   </div>
                 </a>
-              )) || []}
-            </ul>
+              ))}
+            </div>
           ) : (
             <p className="section-empty">Sem notícias recentes encontradas para este ativo.</p>
           )}
           
-          <h4 style={{ marginTop: '24px' }}>📅 Próximos Eventos Importantes</h4>
-          {data.upcomingEvents?.length ? (
-            <ul className="events-list">
-              {data.upcomingEvents?.map((event, index) => (
-                <li key={index} className="event-item">
-                  <span className="event-icon">📌</span>
-                  <div className="event-details">
-                    <span className="event-name">{event.event}</span>
-                    <span className="event-date">{event.date}</span>
-                  </div>
-                </li>
-              )) || []}
-            </ul>
-          ) : (
-            <p className="section-empty">Sem eventos confirmados com dados públicos disponíveis.</p>
-          )}
         </section>
 
       </div>

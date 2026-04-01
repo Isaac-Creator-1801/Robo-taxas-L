@@ -1,0 +1,66 @@
+/* Fundamental Analysis Grid Styles */
+.fundamental-grid-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.media-label {
+  text-align: right;
+  color: #00f2fe;
+}
+
+.fundamental-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  padding: 10px 12px;
+  border-radius: 6px;
+  transition: background 0.2s;
+  align-items: center;
+}
+
+.fundamental-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.fundamental-row .label {
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.fundamental-row .data-value {
+  color: #00f2fe;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+}
+
+.fundamental-row .media-value {
+  text-align: right;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+}
+
+.fundamental-row-simple {
+  display: flex !important;
+  justify-content: space-between !important;
+  padding: 10px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  margin-top: 4px;
+}
+
+.fundamental-row-simple .label {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.fundamental-row-simple .data-value {
+  color: #00f2fe;
+  font-weight: 600;
+}

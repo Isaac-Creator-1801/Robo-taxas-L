@@ -1,6 +1,9 @@
-import { fetchStockData, fetchQuoteDetails, fetchSingleQuote } from './stockService';
+import { fetchStockData, fetchQuoteDetails, fetchSingleQuote, fetchChartData } from './stockService';
+import { fetchExtraFundamentals, fetchHistoricalAverages, fetchUpcomingEvents } from './fundamentalService';
 import { fetchInsiderActivity } from './insiderService';
 import { fetchRecentNews } from './newsService';
+import { calculatePricePredictions } from './predictionService';
+import { fetchInternationalMarketData } from './internationalService';
 
 const FALLBACK_INSIDER = {
   status: 'unavailable',
@@ -32,19 +35,38 @@ export const analyzeStock = async (symbol) => {
   const resolvedSymbol = basicData.symbol || symbol;
 
   // Busca dados complementares em paralelo com fallbacks
-  const [quoteDetails, insiderActivity, recentNews] = await Promise.all([
-    fetchQuoteDetails(resolvedSymbol, { fundamental: true })
-      .catch(() => fetchQuoteDetails(resolvedSymbol))
-      .catch(() => ({})),
+  // Limpamos o ticker para buscas externas (News/Events funcionam melhor sem .SA)
+  const cleanSymbol = resolvedSymbol.split('.')[0];
+  
+  const [quoteDetails, chartHistory, extraFundamentals, historicalAverages, insiderActivity, recentNews, upcomingEvents, internationalRelations] = await Promise.all([
+    fetchQuoteDetails(resolvedSymbol, { fundamental: true }),
+    fetchChartData(resolvedSymbol, '1y', '1d')
+      .catch(() => ({ historicalDataPrice: [] })),
+    fetchExtraFundamentals(resolvedSymbol),
+    fetchHistoricalAverages(resolvedSymbol),
     fetchInsiderActivity(resolvedSymbol, { windowMonths: 6 })
       .catch(() => FALLBACK_INSIDER),
-    fetchRecentNews({ symbol: resolvedSymbol, companyName: basicData.companyName, limit: 4 })
-      .catch(() => [])
+    fetchRecentNews({ symbol: cleanSymbol, companyName: basicData.companyName, limit: 4 })
+      .catch(() => []),
+    fetchUpcomingEvents(resolvedSymbol)
+      .catch(() => []),
+    fetchInternationalMarketData()
+      .catch(() => ({ status: 'unavailable', summary: 'Dados macro indisponíveis.' }))
   ]);
 
-  const historicalData = normalizeHistoricalData(quoteDetails);
+  // Merge fundamental data and history
+  const enrichedQuoteDetails = {
+    ...quoteDetails,
+    ...extraFundamentals, // Priorizar dados da Brapi Fundamental
+    historicalDataPrice: chartHistory.historicalDataPrice || quoteDetails.historicalDataPrice || []
+  };
+
+  const historicalData = normalizeHistoricalData(enrichedQuoteDetails);
   const technicalAnalysis = calculateTechnicalAnalysis(historicalData, basicData.currentPrice);
-  const fundamentalAnalysis = calculateFundamentalAnalysis(quoteDetails);
+  const fundamentalAnalysis = {
+    ...calculateFundamentalAnalysis(enrichedQuoteDetails),
+    averages: historicalAverages
+  };
   const riskAssessment = calculateRiskAssessment(historicalData, fundamentalAnalysis);
 
   const sectorAnalysis = await calculateSectorAnalysis({
@@ -73,13 +95,13 @@ export const analyzeStock = async (symbol) => {
     ...basicData,
     technicalAnalysis,
     fundamentalAnalysis,
-    internationalRelations: null,
+    internationalRelations,
     sectorAnalysis,
-    pricePredictions: null,
+    pricePredictions: calculatePricePredictions(historicalData, basicData.currentPrice, technicalAnalysis),
     riskAssessment,
     insiderActivity,
     recentNews,
-    upcomingEvents: [],
+    upcomingEvents: Array.isArray(upcomingEvents) ? upcomingEvents : [],
     recommendation: getRecommendationFromScore(buyScoreDetails.score),
     confidenceScore: calculateConfidenceScore({
       fundamentalAnalysis,
@@ -213,45 +235,42 @@ const calculateVolumeTrend = (historicalData) => {
 };
 
 const calculateTechnicalAnalysis = (historicalData, currentPrice) => {
-  if (!Array.isArray(historicalData) || historicalData.length === 0) {
-    return {
-      trend: 'N/A',
-      supportLevel: null,
-      resistanceLevel: null,
-      rsi: null,
-      macd: null,
-      movingAverages: {
-        ma20: null,
-        ma50: null,
-        ma200: null
-      },
-      volumeTrend: 'N/A',
-      dataPoints: 0
-    };
+  const defaultTechnical = {
+    trend: 'lateralização',
+    supportLevel: null,
+    resistanceLevel: null,
+    rsi: 50,
+    macd: 0,
+    movingAverages: { ma20: null, ma50: null, ma200: null },
+    volumeTrend: 'neutro',
+    dataPoints: 0
+  };
+
+  if (!Array.isArray(historicalData) || historicalData.length < 2) {
+    return defaultTechnical;
   }
 
   const closes = historicalData.map((entry) => entry.close).filter(Number.isFinite);
   const lastPrice = Number.isFinite(currentPrice) ? currentPrice : closes[closes.length - 1];
+  
+  const rsiValue = calculateRSI(closes, 14);
+  const macdValue = calculateMACD(closes);
+  
   const ma20 = calculateMovingAverage(closes, 20);
   const ma50 = calculateMovingAverage(closes, 50);
   const ma200 = calculateMovingAverage(closes, 200);
+  
   const recentWindow = historicalData.slice(-20);
   const lows = recentWindow.map((entry) => entry.low).filter(Number.isFinite);
   const highs = recentWindow.map((entry) => entry.high).filter(Number.isFinite);
-  const supportLevel = lows.length > 0 ? Math.min(...lows) : null;
-  const resistanceLevel = highs.length > 0 ? Math.max(...highs) : null;
 
   return {
     trend: calculateTrendLabel(lastPrice, ma50, ma200),
-    supportLevel,
-    resistanceLevel,
-    rsi: calculateRSI(closes, 14),
-    macd: calculateMACD(closes),
-    movingAverages: {
-      ma20,
-      ma50,
-      ma200
-    },
+    supportLevel: lows.length > 0 ? Math.min(...lows) : lastPrice * 0.95,
+    resistanceLevel: highs.length > 0 ? Math.max(...highs) : lastPrice * 1.05,
+    rsi: rsiValue ?? 50,
+    macd: macdValue ?? 0,
+    movingAverages: { ma20, ma50, ma200 },
     volumeTrend: calculateVolumeTrend(historicalData),
     dataPoints: closes.length
   };
@@ -271,12 +290,14 @@ const toPercent = (value) => {
 const calculateFundamentalAnalysis = (quoteDetails) => {
   return {
     peRatio: toNumber(quoteDetails?.trailingPE ?? quoteDetails?.priceEarnings ?? quoteDetails?.peRatio),
-    pbRatio: toNumber(quoteDetails?.priceToBook ?? quoteDetails?.pbRatio),
-    dividendYield: toPercent(quoteDetails?.dividendYield ?? quoteDetails?.trailingAnnualDividendYield),
+    pbRatio: toNumber(quoteDetails?.priceToBook ?? quoteDetails?.pbRatio ?? quoteDetails?.priceToBookRatio),
+    dividendYield: toPercent(quoteDetails?.dividendYield ?? quoteDetails?.trailingAnnualDividendYield ?? quoteDetails?.yield),
     debtToEquity: toNumber(quoteDetails?.debtToEquity),
     roe: toPercent(quoteDetails?.returnOnEquity ?? quoteDetails?.roe),
     profitMargin: toPercent(quoteDetails?.profitMargins ?? quoteDetails?.profitMargin),
-    revenueGrowth: toPercent(quoteDetails?.revenueGrowth ?? quoteDetails?.revenueGrowthYearly)
+    revenueGrowth: toPercent(quoteDetails?.revenueGrowth ?? quoteDetails?.revenueGrowthYearly),
+    earningsPerShare: toNumber(quoteDetails?.earningsPerShare ?? quoteDetails?.eps),
+    bookValuePerShare: toNumber(quoteDetails?.bookValuePerShare ?? quoteDetails?.bookValue)
   };
 };
 
