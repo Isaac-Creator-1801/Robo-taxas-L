@@ -6,35 +6,58 @@ import { fetchQuoteDetails, fetchChartData } from './stockService';
 const fundamentalCache = new Map();
 
 /**
- * Mapeia os dados da Brapi para o formato esperado pela UI
+ * Busca dados fundamentalistas extras da Brapi com persistência local
  */
 export const fetchExtraFundamentals = async (symbol) => {
   const cacheKey = `fundamental_${symbol}`;
+  const localCacheKey = `brapi_fundamental_local_${symbol}`;
+  
+  // 1. Tentar Cache em Memória (Rápido)
   if (fundamentalCache.has(cacheKey)) return fundamentalCache.get(cacheKey);
 
   try {
-    // Busca dados com a flag fundamental=true da Brapi
+    // 2. Tentar API Real
     const data = await fetchQuoteDetails(symbol, { fundamental: true });
     
-    if (!data) return {};
+    if (data) {
+      const result = {
+        peRatio: data.priceEarnings || data.trailingPE || data.pe || data.pe_ratio || data.p_l,
+        pbRatio: data.priceToBook || data.pbRatio || data.pb || data.p_vp || data.price_to_book,
+        roe: data.returnOnEquity || (data.roe ? data.roe * 100 : null) || data.return_on_equity,
+        dividendYield: data.dividendYield || (data.yield ? data.yield * 100 : null) || data.dy,
+        earningsPerShare: data.earningsPerShare || data.eps || data.earnings_per_share || data.lpa,
+        bookValuePerShare: data.bookValuePerShare || data.bookValue || data.book_value_per_share || data.vpa,
+        profitMargin: data.profitMargins || data.netProfitMargin || data.margem_liquida,
+        revenueGrowth: data.revenueGrowth || data.revenueGrowthYearly || data.crescimento_receita,
+        isCached: false,
+        timestamp: Date.now()
+      };
 
-    const result = {
-      peRatio: data.priceEarnings || data.trailingPE || data.pe || data.pe_ratio || data.p_l,
-      pbRatio: data.priceToBook || data.pbRatio || data.pb || data.p_vp || data.price_to_book,
-      roe: data.returnOnEquity || (data.roe ? data.roe * 100 : null) || data.return_on_equity,
-      dividendYield: data.dividendYield || (data.yield ? data.yield * 100 : null) || data.dy,
-      earningsPerShare: data.earningsPerShare || data.eps || data.earnings_per_share || data.lpa,
-      bookValuePerShare: data.bookValuePerShare || data.bookValue || data.book_value_per_share || data.vpa,
-      profitMargin: data.profitMargins || data.netProfitMargin || data.margem_liquida,
-      revenueGrowth: data.revenueGrowth || data.revenueGrowthYearly || data.crescimento_receita
-    };
-
-    fundamentalCache.set(cacheKey, result);
-    return result;
+      // Salvar no Cache de Memória e no LocalStorage (Pesado/Persistente)
+      fundamentalCache.set(cacheKey, result);
+      try {
+        localStorage.setItem(localCacheKey, JSON.stringify(result));
+      } catch (e) {}
+      
+      return result;
+    }
   } catch (error) {
-    console.error(`[fundamentalService] Erro ao buscar fundamentos Brapi para ${symbol}:`, error.message);
-    return {};
+    console.warn(`[fundamentalService] API falhou para ${symbol} (Limite?), tentando cache local...`);
   }
+
+  // 3. FALLBACK: Tentar LocalStorage se a API falhar ou der limite
+  try {
+    const localData = localStorage.getItem(localCacheKey);
+    if (localData) {
+      const parsed = JSON.parse(localData);
+      // Marcar como cache para a UI avisar o usuário
+      const result = { ...parsed, isCached: true };
+      fundamentalCache.set(cacheKey, result);
+      return result;
+    }
+  } catch (e) {}
+
+  return {};
 };
 
 /**

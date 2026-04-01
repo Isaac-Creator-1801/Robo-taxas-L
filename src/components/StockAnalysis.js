@@ -139,6 +139,24 @@ const StockAnalysis = ({ stockSymbol }) => {
 
       {/* Price Info */}
       <div className="price-info">
+        {/* Banner de Status de API (Modo Sobrevivência) */}
+        {(data.source === 'cache' || data.isCached) && (
+          <div className="resilience-banner" style={{ 
+            backgroundColor: '#fffbeb', 
+            borderLeft: '4px solid #f59e0b', 
+            padding: '10px', 
+            marginBottom: '15px', 
+            borderRadius: '4px',
+            fontSize: '13px',
+            color: '#b45309',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span>💾</span>
+            <span><strong>Modo de Sobrevivência:</strong> Exibindo dados salvos em cache (Limite de API atingido).</span>
+          </div>
+        )}
         <p>💰 Preço atual: ${formatNumber(data.currentPrice)}</p>
         <p style={{ color: changeColor }}>
           {changeSymbol} Variação: {formatNumber(data.changePercent)}%
