@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient';
  * Registra a pesquisa de um ticker no banco de dados.
  */
 export const logSearch = async (symbol) => {
+  if (!supabase) return;
   if (!symbol || typeof symbol !== 'string') return;
   
   const cleanSymbol = symbol.toUpperCase().trim();
@@ -27,6 +28,7 @@ export const logSearch = async (symbol) => {
  * Busca os tickers mais pesquisados (Top 5).
  */
 export const getTopSearches = async (limit = 5) => {
+  if (!supabase) return [];
   try {
     const { data, error } = await supabase
       .from('search_logs')
