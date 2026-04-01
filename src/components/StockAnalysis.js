@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { analyzeStock } from '../api/marketAnalysisService';
 import ValuationCalculator from './ValuationCalculator';
+import StockChart from './StockChart';
 
 const StockAnalysis = ({ stockSymbol }) => {
   const [data, setData] = useState(null);
@@ -95,8 +96,33 @@ const StockAnalysis = ({ stockSymbol }) => {
   const buyScoreFill = buyScoreValue !== null ? Math.min(100, Math.max(0, buyScoreValue)) : 0;
   const buyScoreBreakdown = Array.isArray(data.buyScoreBreakdown) ? data.buyScoreBreakdown : [];
 
+  const isSurvivalMode = data.source === 'cache';
+
   return (
     <div className="stock-analysis">
+      {/* Survival Mode Alert */}
+      {isSurvivalMode && (
+        <div style={{
+          background: 'rgba(255, 152, 0, 0.1)',
+          border: '1px solid #FF9800',
+          color: '#FF9800',
+          padding: '12px 20px',
+          borderRadius: '12px',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          backdropFilter: 'blur(8px)',
+          fontSize: '0.9rem'
+        }}>
+          <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+          <div>
+            <strong style={{ display: 'block', marginBottom: '2px' }}>Modo de Sobrevivência Ativado</strong>
+            <span style={{ opacity: 0.8 }}>Limite de API atingido. Exibindo dados salvos em cache.</span>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="analysis-header">
         <h2>{data.companyName || stockSymbol}</h2>
@@ -117,6 +143,9 @@ const StockAnalysis = ({ stockSymbol }) => {
           {changeSymbol} Variação: {formatNumber(data.changePercent)}%
         </p>
       </div>
+
+      {/* Gráfico Estilo Google Finance */}
+      <StockChart symbol={data.symbol || stockSymbol} />
 
       {/* Calculadora de Valuation Mágica */}
       <ValuationCalculator currentPrice={data.currentPrice} symbol={data.symbol || stockSymbol} />

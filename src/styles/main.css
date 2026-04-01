@@ -2090,3 +2090,140 @@ section.news-events::before {
 .trend-symbol { font-weight: 600; }
 .trend-count { font-size: 0.75rem; opacity: 0.6; }
 /* --- AUTOCOMPLETE --- */.SearchBar {z-index: 1000; overflow: visible !important; position: relative;} .SearchBar form {position: relative; overflow: visible !important;} .search-input-wrapper {position: relative; flex: 1; overflow: visible !important;} #stock-search-input {width: 100%;} .search-suggestions {position: absolute; top: 100%; left: 0; right: 0; background: rgba(15, 23, 42, 0.98) !important; backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 12px; list-style: none !important; padding: 8px 0 !important; margin: 8px 0 0 0 !important; z-index: 99999 !important; box-shadow: 0 20px 50px rgba(0,0,0,0.9); max-height: 350px; overflow-y: auto; text-align: left;} .search-suggestions li {padding: 12px 16px !important; display: flex !important; align-items: center !important; gap: 12px !important; cursor: pointer !important; transition: all 0.2s ease !important; border-left: 3px solid transparent !important; color: white !important;} .search-suggestions li:hover, .search-suggestions li.active {background: rgba(59, 130, 246, 0.2) !important; border-left-color: #3b82f6 !important; padding-left: 20px !important;} .suggestion-ticker {font-weight: 800 !important; color: #3b82f6 !important; background: rgba(59, 130, 246, 0.2) !important; padding: 2px 8px !important; border-radius: 6px !important; font-size: 0.85rem !important; min-width: 65px !important; text-align: center !important;} .suggestion-name {flex: 1 !important; font-weight: 500 !important; color: #f8fafc !important;} .suggestion-sector {font-size: 0.75rem !important; color: #94a3b8 !important; font-style: italic !important;}
+
+
+/* Google Finance Chart Styles */
+.stock-chart-container {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 24px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.chart-range-selector {
+  display: flex;
+  gap: 8px;
+  background: rgba(255,255,255,0.03);
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.range-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.range-btn:hover {
+  background: rgba(255,255,255,0.05);
+  color: var(--text-primary);
+}
+
+.range-btn.active {
+  background: var(--accent-teal);
+  color: #000;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.chart-wrapper {
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chart-loader, .chart-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-secondary);
+}
+
+.spinner-small {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(16, 185, 129, 0.1);
+  border-top: 3px solid var(--accent-teal);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.retry-btn {
+  background: var(--accent-gold);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  color: #000;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.chart-footer {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Tooltip Customizada */
+.google-visualization-tooltip {
+  background-color: #1a1a1b !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
+  padding: 12px !important;
+  pointer-events: none !important;
+  min-width: 120px !important;
+}
+
+.google-visualization-tooltip-item-list {
+  list-style: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.google-visualization-tooltip-item {
+  margin: 4px 0 !important;
+}
+
+.google-visualization-tooltip-item span {
+  color: #fff !important;
+  font-family: sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+.google-visualization-tooltip-item:first-child span {
+  color: #888 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+

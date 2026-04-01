@@ -1,6 +1,16 @@
 import axios from 'axios';
 
-const BRAPI_TOKEN = 'hxjPRfTojZgRQhaWe32eDe';
+// LISTA DE TOKENS PARA RODÍZIO (40.000 requisições/mês!) - CARREGADO VIA .ENV
+const BRAPI_TOKENS = [
+  process.env.BRAPI_TOKEN_1,
+  process.env.BRAPI_TOKEN_2,
+  process.env.BRAPI_TOKEN_3,
+  process.env.BRAPI_TOKEN_4
+].filter(t => t); // Remove nulos ou vazios
+
+let currentTokenIndex = 0;
+const getActiveToken = () => BRAPI_TOKENS[currentTokenIndex] || BRAPI_TOKENS[0];
+
 const BASE_URL = 'https://brapi.dev/api/quote/';
 
 // Mapeamento de ações globais para BDRs na B3
@@ -50,12 +60,33 @@ const formatSymbolForDisplay = (apiSymbol) => {
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 const fetchBrapiQuote = async (apiSymbol, params = '') => {
-  const url = params ? `${BASE_URL}${apiSymbol}?${params}` : `${BASE_URL}${apiSymbol}?token=${BRAPI_TOKEN}`;
-  const response = await axios.get(url, { timeout: 8000 });
-  if (response.data?.results?.length > 0) {
-    return response.data.results[0];
+  const maxRetries = BRAPI_TOKENS.length;
+  let attempts = 0;
+
+  while (attempts < maxRetries) {
+    try {
+      const activeToken = getActiveToken();
+      const url = params 
+        ? `${BASE_URL}${apiSymbol}?${params.replace(/token=[^&]*/, `token=${activeToken}`)}` 
+        : `${BASE_URL}${apiSymbol}?token=${activeToken}`;
+      
+      const response = await axios.get(url, { timeout: 8000 });
+      if (response.data?.results?.length > 0) {
+        return response.data.results[0];
+      }
+      throw new Error('Sem resultados');
+    } catch (error) {
+      // Se for erro de limite (429) e tivermos mais tokens, tentamos o próximo
+      if (error.response?.status === 429 && BRAPI_TOKENS.length > 1) {
+        attempts++;
+        currentTokenIndex = (currentTokenIndex + 1) % BRAPI_TOKENS.length;
+        console.warn(`[SurvivalMode] Limite atingido no Token ${attempts}. Trocando para Token ${currentTokenIndex + 1}...`);
+        continue;
+      }
+      throw error;
+    }
   }
-  throw new Error('Sem resultados');
+  throw new Error('Todos os Tokens de API excederam o limite');
 };
 
 const getCachedQuote = (displaySymbol, errorType) => {
@@ -143,7 +174,8 @@ export const fetchSingleQuote = async (displaySymbol) => {
 
 export const fetchQuoteDetails = async (symbol, options = {}) => {
   const apiSymbol = formatSymbolForApi(symbol);
-  const params = new URLSearchParams({ token: BRAPI_TOKEN });
+  const activeToken = getActiveToken();
+  const params = new URLSearchParams({ token: activeToken });
   
   // Parâmetros básicos que funcionam no plano gratuito
   if (options.fundamental) params.append('fundamental', 'true');
@@ -194,7 +226,61 @@ export const fetchStockData = async (symbol) => {
   }
 
   console.warn(`[stockService] fetchStockData erro para ${symbol}: todas as tentativas falharam`);
+  
+  // MODO DE SOBREVIVÊNCIA: Tentar usar dados do cache se tudo falhar
+  const cached = getCachedQuote(symbol, 'SURVIVAL_MODE');
+  if (cached) {
+    return {
+      symbol: formatSymbolForDisplay(symbol),
+      companyName: `${formatSymbolForDisplay(symbol)} (Modo Sobrevivência)`,
+      currentPrice: cached.price,
+      changePercent: cached.change,
+      sector: 'Diversos',
+      currency: 'BRL',
+      realTime: false,
+      source: 'cache'
+    };
+  }
+
   throw new Error(`Não foi possível buscar dados para ${symbol}`);
+};
+
+/**
+ * Busca dados para o gráfico com suporte a range e interval
+ * @param {string} symbol - Ticker da ação
+ * @param {string} range - Período (1d, 5d, 1mo, 6mo, 1y, 5y, max)
+ * @param {string} interval - Intervalo entre pontos (1m, 5m, 15m, 1d, 1wk)
+ */
+export const fetchChartData = async (symbol, range = '1mo', interval = '1d') => {
+  const apiSymbol = formatSymbolForApi(symbol);
+  const activeToken = getActiveToken();
+  
+  const params = new URLSearchParams({
+    range,
+    interval,
+    token: activeToken
+  });
+
+  try {
+    const url = `${BASE_URL}${apiSymbol}?${params.toString()}`;
+    const response = await axios.get(url, { timeout: 10000 });
+    
+    if (response.data?.results?.length > 0) {
+      const result = response.data.results[0];
+      return {
+        symbol: result.symbol,
+        currency: result.currency,
+        historicalDataPrice: result.historicalDataPrice || [],
+        regularMarketPrice: result.regularMarketPrice,
+        regularMarketPreviousClose: result.regularMarketPreviousClose,
+        regularMarketTime: result.regularMarketTime
+      };
+    }
+    throw new Error('Dados de gráfico não encontrados');
+  } catch (error) {
+    console.error(`[stockService] Erro ao buscar dados de gráfico para ${symbol}:`, error.message);
+    throw error;
+  }
 };
 
 // Busca dados do painel: um ativo de cada vez com delay de 300ms entre cada
