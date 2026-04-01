@@ -150,68 +150,56 @@ const ValuationCalculator = ({ currentPrice, symbol, fundamentalData }) => {
           </div>
         )}
 
-        <div className="metric-display-grid-premium">
-          {/* Coluna 1: Preço Atual */}
-          <div className="metric-column-premium">
-            <span className="metric-label-premium">Preço atual</span>
-            <span className="metric-value-featured">{formatCurrency(currentPrice)}</span>
+        <div className="metric-display-grid-premium" style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          gap: '20px', 
+          marginTop: '15px' 
+        }}>
+          {/* Card 1: Preço do Mercado */}
+          <div className="metric-card-bmw" style={{ flex: 1, textAlign: 'center', backgroundColor: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '8px' }}>
+            <span style={{ display: 'block', fontSize: '11px', color: '#888', textTransform: 'uppercase', marginBottom: '5px' }}>Preço Mercado</span>
+            <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#fff' }}>{formatCurrency(currentPrice)}</span>
           </div>
 
-          {/* Coluna 2: Preço Justo / Métrica Central */}
-          <div className="metric-column-premium">
-            {title === 'Peter Lynch' ? (
-              <>
-                <span className="metric-label-premium">Lynch Ratio</span>
-                <span className="metric-value-fair">{data.valid ? data.ratio.toFixed(2) : '---'}</span>
-              </>
-            ) : (
-              <>
-                <span className="metric-label-premium">Preço Justo</span>
-                <span className="metric-value-fair">{data.valid ? formatCurrency(data.fairValue) : '---'}</span>
-              </>
-            )}
+          {/* Card 2: Valor Intrínseco (JUSTO) */}
+          <div className="metric-card-bmw" style={{ flex: 1.2, textAlign: 'center', backgroundColor: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <span style={{ display: 'block', fontSize: '11px', color: '#aaa', textTransform: 'uppercase', marginBottom: '5px' }}>
+              {title === 'Peter Lynch' ? 'Lynch Ratio' : 'Preço Justo'}
+            </span>
+            <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#00ff88' }}>
+              {title === 'Peter Lynch' ? (data.valid ? data.ratio.toFixed(2) : '---') : (data.valid ? formatCurrency(data.fairValue) : '---')}
+            </span>
           </div>
 
-          {/* Coluna 3: Upside / Status */}
-          <div className="metric-column-premium">
-            <span className="metric-label-premium">{title === 'Peter Lynch' ? 'Status' : 'Upside'}</span>
+          {/* Card 3: Upside / Oportunidade */}
+          <div className="metric-card-bmw" style={{ flex: 1, textAlign: 'center', backgroundColor: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '8px' }}>
+            <span style={{ display: 'block', fontSize: '11px', color: '#888', textTransform: 'uppercase', marginBottom: '5px' }}>Potencial</span>
             {data.valid ? (
-              title === 'Peter Lynch' ? (
-                <div className="upside-premium-badge">
-                  <span className="upside-pct-val" style={{color: data.statusColor}}>{data.status}</span>
-                </div>
-              ) : (
-                <div className="upside-premium-badge">
-                  <span className={`upside-pct-val ${data.upside >= 0 ? 'positive' : 'negative'}`}>
-                    {Math.abs(data.upside).toFixed(2)}%
-                  </span>
-                  <span className={`upside-trend-icon ${data.upside >= 0 ? 'positive' : 'negative'}`} style={{color: data.upside >= 0 ? '#10b981' : '#f43f5e'}}>
-                    {data.upside >= 0 ? '▲ OPORTUNIDADE' : '▼ CARO'}
-                  </span>
-                </div>
-              )
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <span style={{ fontSize: '20px', fontWeight: 'bold', color: title === 'Peter Lynch' ? data.statusColor : (data.upside >= 0 ? '#00ff88' : '#f43f5e') }}>
+                  {title === 'Peter Lynch' ? data.status.split(' ')[0] : `${Math.abs(data.upside).toFixed(1)}%`}
+                </span>
+                <span style={{ fontSize: '10px', color: title === 'Peter Lynch' ? data.statusColor : (data.upside >= 0 ? '#00ff88' : '#f43f5e'), marginTop: '2px' }}>
+                  {title === 'Peter Lynch' ? 'SINAL' : (data.upside >= 0 ? '▲ DESCONTO' : '▼ CARO')}
+                </span>
+              </div>
             ) : (
-              <span className="metric-label-premium">Aguardando dados...</span>
+              <span style={{ color: '#555', fontSize: '14px' }}>Aguardando...</span>
             )}
           </div>
         </div>
 
         {data.valid && title !== 'Peter Lynch' && (
-          <div className="valuation-footer-details">
+          <div className="valuation-footer-details" style={{ marginTop: '10px', fontSize: '11px', color: '#666', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
              {title === 'Fórmula de Graham' && (
-               <>
-                 <span>LPA: <span className="metric-pill-dark">{lpa}</span></span>
-                 <span>VPA: <span className="metric-pill-dark">{vpa}</span></span>
-               </>
+               <span>Baseado em LPA <strong>R$ {lpa}</strong> e VPA <strong>R$ {vpa}</strong></span>
              )}
              {title === 'Método Bazin' && (
-               <span>DPA Projetado: <span className="metric-pill-dark">R$ {dpa}</span></span>
+               <span>Provento anual exigido: <strong>R$ {dpa}</strong></span>
              )}
              {title === 'Fluxo de Caixa' && (
-               <>
-                 <span>G (Crescimento): <span className="metric-pill-dark">{growth}%</span></span>
-                 <span>K (Desconto): <span className="metric-pill-dark">{discountRate}%</span></span>
-               </>
+               <span>Taxas: Crescimento <strong>{growth}%</strong> | Risco <strong>{discountRate}%</strong></span>
              )}
           </div>
         )}

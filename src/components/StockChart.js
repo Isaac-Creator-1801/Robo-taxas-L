@@ -36,37 +36,29 @@ const StockChart = ({ symbol }) => {
           throw new Error('Sem histórico disponível.');
         }
 
-        // Formatar dados (FORMATO SIMPLIFICADO: APENAS STRINGS E NÚMEROS)
+        // 1. LIMPEZA E FORMATAÇÃO DE DADOS (Bloomberg Style)
         const rows = [['Data', 'Preço']];
-        
-        data.historicalDataPrice.forEach(point => {
-          if (!point || point.date === null || point.close === null) return;
-          
-          try {
-            const d = new Date(point.date * 1000);
-            if (isNaN(d.getTime())) return;
+        const locale = 'pt-BR';
+        const dateOptions = range === '1d' 
+          ? { hour: '2-digit', minute: '2-digit' } 
+          : { day: '2-digit', month: '2-digit' };
 
-            let label = '';
-            if (range === '1d') {
-              label = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-            } else if (range === '5d' || range === '1mo') {
-              label = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
-            } else {
-              label = `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear().toString().slice(-2)}`;
-            }
-            
-            rows.push([label, Number(point.close.toFixed(2))]);
-          } catch (e) {
-            console.warn('[StockChart] Ponto ignorado');
-          }
+        data.historicalDataPrice.forEach(point => {
+          if (!point || !point.date || point.close === null) return;
+          
+          const d = new Date(point.date * 1000);
+          if (isNaN(d.getTime())) return;
+
+          const label = new Intl.DateTimeFormat(locale, dateOptions).format(d);
+          rows.push([label, Number(point.close.toFixed(2))]);
         });
 
-        if (rows.length <= 1) throw new Error('Dados indisponíveis');
+        if (rows.length <= 1) throw new Error('Histórico insuficiente');
 
         setChartData(rows);
         setStats({
           currency: data.currency || 'BRL',
-          prevClose: data.regularMarketPreviousClose || (rows.length > 1 ? rows[1][1] : 0)
+          prevClose: data.regularMarketPreviousClose || rows[1][1]
         });
       } catch (err) {
         if (isMounted) setError(err.message);
@@ -81,33 +73,34 @@ const StockChart = ({ symbol }) => {
 
   const options = {
     backgroundColor: 'transparent',
-    colors: ['#10b981'],
-    areaOpacity: 0.15,
+    colors: ['#00ff88'], // Cor Verde Neon Bloomberg
+    areaOpacity: 0.1,
     hAxis: {
-      textStyle: { color: '#888', fontSize: 10 },
+      textStyle: { color: '#666', fontSize: 10, fontFamily: 'Inter' },
       gridlines: { color: 'transparent' },
       baselineColor: 'transparent',
-      textPosition: 'out'
     },
     vAxis: {
-      textStyle: { color: '#888', fontSize: 10 },
-      gridlines: { color: 'rgba(255,255,255,0.05)' },
-      baselineColor: 'rgba(255,255,255,0.1)',
-      format: 'decimal'
+      textStyle: { color: '#666', fontSize: 10, fontFamily: 'Inter' },
+      gridlines: { color: 'rgba(255,255,255,0.03)' },
+      baselineColor: 'transparent',
+      format: 'short'
     },
-    chartArea: { width: '90%', height: '80%', top: 20, bottom: 40 },
+    chartArea: { width: '95%', height: '80%', top: 20, bottom: 40 },
     legend: { position: 'none' },
-    focusTarget: 'category', // FAZ O TOOLTIP SEGUIR O MOUSE HORIZONTALMENTE
+    focusTarget: 'category', // CRÍTICO: Tooltip segue o mouse horizontalmente
     tooltip: { 
       trigger: 'both',
-      isHtml: true
+      isHtml: true,
+      textStyle: { color: '#fff', fontSize: 12 }
     },
     crosshair: { 
       trigger: 'both', 
       orientation: 'vertical',
-      color: '#10b981', 
-      opacity: 0.5 
-    }
+      color: '#00ff88', 
+      opacity: 0.4 
+    },
+    animation: { startup: true, duration: 600, easing: 'out' }
   };
 
   return (
