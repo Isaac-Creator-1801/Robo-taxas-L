@@ -2,6 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Chart } from 'react-google-charts';
 import { fetchChartData } from '../api/stockService';
 
+const ranges = [
+  { label: '1D', value: '1d', interval: '5m' },
+  { label: '5D', value: '5d', interval: '15m' },
+  { label: '1M', value: '1mo', interval: '1d' },
+  { label: '6M', value: '6mo', interval: '1d' },
+  { label: 'YTD', value: 'ytd', interval: '1d' },
+  { label: '1Y', value: '1y', interval: '1d' },
+  { label: '5Y', value: '5y', interval: '1wk' },
+  { label: 'Max', value: 'max', interval: '1mo' },
+];
+
 const StockChart = ({ symbol }) => {
   const [range, setRange] = useState('1mo');
   const [chartData, setChartData] = useState([]);
@@ -9,47 +20,28 @@ const StockChart = ({ symbol }) => {
   const [error, setError] = useState(null);
   const [stats, setStats] = useState(null);
 
-  const ranges = [
-    { label: '1D', value: '1d', interval: '5m' },
-    { label: '5D', value: '5d', interval: '15m' },
-    { label: '1M', value: '1mo', interval: '1d' },
-    { label: '6M', value: '6mo', interval: '1d' },
-    { label: 'YTD', value: 'ytd', interval: '1d' },
-    { label: '1Y', value: '1y', interval: '1d' },
-    { label: '5Y', value: '5y', interval: '1wk' },
-    { label: 'Max', value: 'max', interval: '1mo' },
-  ];
-
   useEffect(() => {
+    let isMounted = true;
     const loadData = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        const currentRange = ranges.find(r => r.value === range);
-        const data = await fetchChartData(symbol, range, currentRange.interval);
+        const currentRangeConfigs = ranges.find(r => r.value === range);
+        const data = await fetchChartData(symbol, range, currentRangeConfigs.interval);
         
+        if (!isMounted) return;
+
         if (!data.historicalDataPrice || data.historicalDataPrice.length === 0) {
-          throw new Error('Histórico indisponível para este período.');
+          throw new Error('Dados históricos não disponíveis para este período.');
         }
 
-        // Formatar dados para o Google Charts
-        // [ ["Label", "Preço"], ["Time", Val], ... ]
-        const formatted = [['Tempo', 'Preço']];
+        // Formatar dados para o Google Charts usando Objetos Date para melhor escala
+        const formatted = [[{ type: 'date', label: 'Data' }, 'Preço']];
         
         data.historicalDataPrice.forEach(point => {
           const date = new Date(point.date * 1000);
-          let label = '';
-          
-          if (range === '1d') {
-            label = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-          } else if (range === '5d') {
-             label = `${date.getDate()}/${date.getMonth()+1} ${date.getHours()}:00`;
-          } else {
-            label = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-          }
-          
-          formatted.push([label, point.close]);
+          formatted.push([date, point.close]);
         });
 
         setChartData(formatted);
@@ -59,51 +51,53 @@ const StockChart = ({ symbol }) => {
           currency: data.currency
         });
       } catch (err) {
-        setError(err.message);
+        if (isMounted) setError(err.message);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
     if (symbol) {
       loadData();
     }
+    return () => { isMounted = false; };
   }, [symbol, range]);
 
   const options = {
     backgroundColor: 'transparent',
     colors: ['#10b981'],
-    areaOpacity: 0.1,
+    areaOpacity: 0.15,
     hAxis: {
       textStyle: { color: '#888', fontSize: 10 },
       gridlines: { color: 'transparent' },
       baselineColor: 'transparent',
+      format: range === '1d' ? 'HH:mm' : range === '5d' ? 'dd/MM HH:mm' : 'dd/MM/yy',
     },
     vAxis: {
       textStyle: { color: '#888', fontSize: 10 },
       gridlines: { color: 'rgba(255,255,255,0.05)' },
       baselineColor: 'rgba(255,255,255,0.1)',
-      format: 'decimal',
+      format: 'currency',
     },
-    chartArea: { width: '90%', height: '80%' },
+    chartArea: { width: '90%', height: '80%', top: 20, bottom: 40 },
     legend: { position: 'none' },
     tooltip: { 
       isHtml: true,
-      trigger: 'both',
-      textStyle: { color: '#fff' }
+      trigger: 'both'
     },
     crosshair: {
       trigger: 'both',
       orientation: 'vertical',
       color: '#888',
       opacity: 0.5
+    },
+    explorer: {
+      actions: ['dragToZoom', 'rightClickToReset'],
+      axis: 'horizontal',
+      keepInBounds: true,
+      maxZoomIn: 4.0
     }
   };
-
-  if (error && range !== '1mo') {
-     // Se der erro em um range específico, tentamos voltar pro 1M automático? 
-     // Por enquanto só exibe o erro
-  }
 
   return (
     <div className="stock-chart-container">
@@ -125,7 +119,7 @@ const StockChart = ({ symbol }) => {
         {loading ? (
           <div className="chart-loader">
             <div className="spinner-small"></div>
-            <span>Carregando gráfico...</span>
+            <span>Carregando dados...</span>
           </div>
         ) : error ? (
           <div className="chart-error">
@@ -134,12 +128,13 @@ const StockChart = ({ symbol }) => {
           </div>
         ) : (
           <Chart
+            key={`${symbol}-${range}`} // Forçar re-montagem ao trocar períodos
             chartType="AreaChart"
             width="100%"
-            height="320px"
+            height="350px"
             data={chartData}
             options={options}
-            loader={<div>Carregando...</div>}
+            loader={<div className="chart-loader"><div className="spinner-small"></div></div>}
           />
         )}
       </div>
