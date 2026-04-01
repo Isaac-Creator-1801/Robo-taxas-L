@@ -109,6 +109,8 @@ const getCachedQuote = (displaySymbol, errorType) => {
 // Busca dados de UM único ativo usando a Brapi
 export const fetchSingleQuote = async (displaySymbol) => {
   const apiSymbol = formatSymbolForApi(displaySymbol);
+  const originalSymbol = displaySymbol.toUpperCase().replace('.SA', '');
+  const hasBdrMapping = globalToBdrMap[originalSymbol];
 
   try {
     if (displaySymbol === 'BRL=X') {
@@ -134,7 +136,19 @@ export const fetchSingleQuote = async (displaySymbol) => {
       throw new Error('Sem resultados');
     }
 
-    const item = await fetchBrapiQuote(apiSymbol);
+    let item;
+    try {
+      item = await fetchBrapiQuote(apiSymbol);
+    } catch (error) {
+      // Se BDR falhar e tem mapeamento, tentar ticker original
+      if (hasBdrMapping && apiSymbol !== originalSymbol) {
+        console.warn(`[stockService] SingleQuote: BDR ${apiSymbol} falhou, tentando ticker original ${originalSymbol}`);
+        item = await fetchBrapiQuote(originalSymbol);
+      } else {
+        throw error;
+      }
+    }
+
     const resultData = {
       price: item.regularMarketPrice,
       change: item.regularMarketChangePercent,
@@ -174,6 +188,8 @@ export const fetchSingleQuote = async (displaySymbol) => {
 
 export const fetchQuoteDetails = async (symbol, options = {}) => {
   const apiSymbol = formatSymbolForApi(symbol);
+  const originalSymbol = symbol.toUpperCase().replace('.SA', '');
+  const hasBdrMapping = globalToBdrMap[originalSymbol];
   const activeToken = getActiveToken();
   const params = new URLSearchParams({ token: activeToken });
   
@@ -187,7 +203,21 @@ export const fetchQuoteDetails = async (symbol, options = {}) => {
     // Se falhar, tentar sem parâmetros extras (plano gratuito básico)
     if (error.response?.status === 400) {
       console.warn(`[stockService] Parâmetros extras rejeitados para ${apiSymbol}, usando plano básico`);
-      return await fetchBrapiQuote(apiSymbol);
+      try {
+        return await fetchBrapiQuote(apiSymbol);
+      } catch (innerError) {
+        // Se BDR falhar e tem mapeamento, tentar ticker original
+        if (hasBdrMapping) {
+          console.warn(`[stockService] Tentando ticker original ${originalSymbol} para ${apiSymbol}`);
+          return await fetchBrapiQuote(originalSymbol);
+        }
+        throw innerError;
+      }
+    }
+    // Se for 404 (ticker não encontrado) e tem mapeamento BDR, tentar ticker original
+    if (error.response?.status === 404 && hasBdrMapping) {
+      console.warn(`[stockService] BDR ${apiSymbol} não encontrado, tentando ticker original ${originalSymbol}`);
+      return await fetchBrapiQuote(originalSymbol);
     }
     throw error;
   }
@@ -197,6 +227,8 @@ export const fetchQuoteDetails = async (symbol, options = {}) => {
 export const fetchStockData = async (symbol) => {
   const apiSymbol = formatSymbolForApi(symbol);
   const knownInfo = companyDatabase[apiSymbol] || {};
+  const originalSymbol = symbol.toUpperCase().replace('.SA', '');
+  const hasBdrMapping = globalToBdrMap[originalSymbol];
 
   // Tentar múltiplas abordagens para buscar dados
   const attempts = [
@@ -204,6 +236,15 @@ export const fetchStockData = async (symbol) => {
     () => fetchQuoteDetails(symbol),
     () => fetchBrapiQuote(apiSymbol)
   ];
+
+  // Se o ticker tem mapeamento BDR, adicionar fallback para o ticker original
+  if (hasBdrMapping) {
+    const originalToken = getActiveToken();
+    attempts.push(
+      () => fetchBrapiQuote(originalSymbol, `token=${originalToken}`),
+      () => fetchBrapiQuote(originalSymbol, `token=${originalToken}&fundamental=true`)
+    );
+  }
 
   for (const attempt of attempts) {
     try {
@@ -253,6 +294,8 @@ export const fetchStockData = async (symbol) => {
  */
 export const fetchChartData = async (symbol, range = '1mo', interval = '1d') => {
   const apiSymbol = formatSymbolForApi(symbol);
+  const originalSymbol = symbol.toUpperCase().replace('.SA', '');
+  const hasBdrMapping = globalToBdrMap[originalSymbol];
   const activeToken = getActiveToken();
   
   const params = new URLSearchParams({
@@ -261,8 +304,8 @@ export const fetchChartData = async (symbol, range = '1mo', interval = '1d') => 
     token: activeToken
   });
 
-  try {
-    const url = `${BASE_URL}${apiSymbol}?${params.toString()}`;
+  const tryFetch = async (sym) => {
+    const url = `${BASE_URL}${sym}?${params.toString()}`;
     const response = await axios.get(url, { timeout: 10000 });
     
     if (response.data?.results?.length > 0) {
@@ -277,7 +320,21 @@ export const fetchChartData = async (symbol, range = '1mo', interval = '1d') => 
       };
     }
     throw new Error('Dados de gráfico não encontrados');
+  };
+
+  try {
+    return await tryFetch(apiSymbol);
   } catch (error) {
+    // Se BDR falhar e tem mapeamento, tentar ticker original
+    if (hasBdrMapping && apiSymbol !== originalSymbol) {
+      console.warn(`[stockService] Gráfico: BDR ${apiSymbol} falhou, tentando ticker original ${originalSymbol}`);
+      try {
+        return await tryFetch(originalSymbol);
+      } catch (innerError) {
+        console.error(`[stockService] Erro ao buscar dados de gráfico para ${symbol}:`, innerError.message);
+        throw innerError;
+      }
+    }
     console.error(`[stockService] Erro ao buscar dados de gráfico para ${symbol}:`, error.message);
     throw error;
   }
