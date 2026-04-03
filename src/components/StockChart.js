@@ -36,26 +36,42 @@ const StockChart = ({ symbol }) => {
           throw new Error('Sem histórico disponível.');
         }
 
-        // 1. LIMPEZA E FORMATAÇÃO DE DADOS (Bloomberg Style)
-        const rows = [['Data', 'Preço']];
-        const locale = 'pt-BR';
-        const dateOptions = range === '1d' 
-          ? { hour: '2-digit', minute: '2-digit' } 
-          : { day: '2-digit', month: '2-digit' };
+      // 1. LIMPEZA E FORMATAÇÃO DE DADOS (Bloomberg Style)
+      const rows = [['Data', 'Preço']];
+      const locale = 'pt-BR';
+      const dateOptions = range === '1d' 
+        ? { hour: '2-digit', minute: '2-digit' } 
+        : { day: '2-digit', month: '2-digit' };
+      
+      // Filtrar e ordenar dados históricos
+      const validHistoricalData = (data.historicalDataPrice || [])
+        .filter(point => point && point.date && point.close !== null)
+        .map(point => ({
+          ...point,
+          dateObj: new Date(point.date * 1000)
+        }))
+        .filter(point => !isNaN(point.dateObj.getTime()))
+        .sort((a, b) => a.dateObj - b.dateObj);
+      
+      // Garantir que o último ponto seja o valor atual
+      if (validHistoricalData.length > 0 && Number.isFinite(data.regularMarketPrice)) {
+        const lastPoint = validHistoricalData[validHistoricalData.length - 1];
+        lastPoint.close = data.regularMarketPrice;
+      }
+      
+      validHistoricalData.forEach(point => {
+        const label = new Intl.DateTimeFormat(locale, dateOptions).format(point.dateObj);
+        rows.push([label, Number(point.close.toFixed(2))]);
+      });
 
-        data.historicalDataPrice.forEach(point => {
-          if (!point || !point.date || point.close === null) return;
-          
-          const d = new Date(point.date * 1000);
-          if (isNaN(d.getTime())) return;
+      if (rows.length <= 1) throw new Error('Histórico insuficiente');
 
-          const label = new Intl.DateTimeFormat(locale, dateOptions).format(d);
-          rows.push([label, Number(point.close.toFixed(2))]);
-        });
-
-        if (rows.length <= 1) throw new Error('Histórico insuficiente');
-
-        setChartData(rows);
+      setChartData(rows);
+      setStats({
+        currency: data.currency || 'BRL',
+        prevClose: data.regularMarketPreviousClose || rows[1]?.[1],
+        currentPrice: data.regularMarketPrice
+      });
         setStats({
           currency: data.currency || 'BRL',
           prevClose: data.regularMarketPreviousClose || rows[1][1]
@@ -144,6 +160,9 @@ const StockChart = ({ symbol }) => {
       {stats && !loading && !error && (
         <div className="chart-footer">
           <span className="prev-close">Fechamento anterior: {stats.currency} {stats.prevClose?.toFixed(2)}</span>
+          {stats.currentPrice && (
+            <span className="current-price">Atual: {stats.currency} {stats.currentPrice.toFixed(2)}</span>
+          )}
         </div>
       )}
     </div>

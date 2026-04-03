@@ -560,6 +560,10 @@ section.news-events::before {
   background: linear-gradient(90deg, transparent, var(--color-neutral), transparent);
 }
 
+section.share-lending::before {
+  background: linear-gradient(90deg, transparent, var(--color-neutral), transparent);
+}
+
 .analysis-sections section h3 {
   color: var(--text-primary);
   margin-bottom: 18px;
@@ -617,6 +621,10 @@ section.news-events::before {
 }
 
 .news-events h3 .section-icon {
+  background: var(--color-neutral-dim);
+}
+
+.share-lending h3 .section-icon {
   background: var(--color-neutral-dim);
 }
 
@@ -969,6 +977,129 @@ section.news-events::before {
   color: var(--text-muted);
 }
 
+/* === Share Lending === */
+.share-lending-intro {
+  margin: 8px 0 14px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.share-lending-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.share-lending-meta span {
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.share-lending-meta .share-lending-stale {
+  background: rgba(255, 167, 38, 0.15);
+  border-color: rgba(255, 167, 38, 0.3);
+  color: var(--color-neutral);
+}
+
+.share-lending-source {
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: var(--accent-blue);
+  border-radius: var(--radius-pill);
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.share-lending-source:hover {
+  color: var(--accent-cyan);
+  border-color: rgba(34, 211, 238, 0.4);
+}
+
+.share-lending-grid {
+  display: grid;
+  gap: 14px;
+}
+
+@media (min-width: 900px) {
+  .share-lending-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.share-lending-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+
+.share-lending-card h4 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.share-lending-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 6px 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.share-lending-item .value {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.share-lending-rate {
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.share-lending-signal {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.share-lending-signal.above {
+  background: var(--color-bearish-dim);
+  color: var(--color-bearish);
+  border: 1px solid rgba(255, 23, 68, 0.2);
+}
+
+.share-lending-signal.below {
+  background: var(--color-bullish-dim);
+  color: var(--color-bullish);
+  border: 1px solid rgba(0, 200, 83, 0.2);
+}
+
+.share-lending-signal.neutral {
+  background: rgba(107, 114, 128, 0.12);
+  color: var(--text-muted);
+  border: 1px solid var(--border-default);
+}
+
+.share-lending-footnote {
+  margin-top: 8px;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
 .insider-empty {
   color: var(--text-muted);
   font-style: italic;
@@ -980,6 +1111,10 @@ section.news-events::before {
 }
 
 .analysis-sections .insider-activity {
+  grid-column: 1 / -1;
+}
+
+.analysis-sections .share-lending {
   grid-column: 1 / -1;
 }
 
@@ -2081,7 +2216,7 @@ section.news-events::before {
   }
 }
 
-/* Estilos para Tendências da Comunidade */
+/* Estilos para Tendï¿½ncias da Comunidade */
 .trends-section { margin-bottom: 2rem; }
 .trends-grid { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 15px; }
 .trend-tag { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); padding: 8px 16px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s ease; }
@@ -2189,7 +2324,13 @@ section.news-events::before {
   font-size: 0.8rem;
   color: var(--text-muted);
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.current-price {
+  font-weight: 600;
+  color: var(--accent-gold);
 }
 
 /* Tooltip Customizada */
