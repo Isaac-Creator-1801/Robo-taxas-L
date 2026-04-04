@@ -32,59 +32,73 @@ const StockChart = ({ symbol }) => {
         
         if (!isMounted) return;
 
-        if (!data.historicalDataPrice || data.historicalDataPrice.length === 0) {
-          throw new Error('Sem histórico disponível.');
+        // Verificar se há dados suficientes
+        if (!data || !data.historicalDataPrice || data.historicalDataPrice.length === 0) {
+          throw new Error('Histórico insuficiente.');
         }
 
-      // 1. LIMPEZA E FORMATAÇÃO DE DADOS (Bloomberg Style)
-      const rows = [['Data', 'Preço']];
-      const locale = 'pt-BR';
-      const dateOptions = range === '1d' 
-        ? { hour: '2-digit', minute: '2-digit' } 
-        : { day: '2-digit', month: '2-digit' };
-      
-      // Filtrar e ordenar dados históricos
-      const validHistoricalData = (data.historicalDataPrice || [])
-        .filter(point => point && point.date && point.close !== null)
-        .map(point => ({
-          ...point,
-          dateObj: new Date(point.date * 1000)
-        }))
-        .filter(point => !isNaN(point.dateObj.getTime()))
-        .sort((a, b) => a.dateObj - b.dateObj);
-      
-      // Garantir que o último ponto seja o valor atual
-      if (validHistoricalData.length > 0 && Number.isFinite(data.regularMarketPrice)) {
-        const lastPoint = validHistoricalData[validHistoricalData.length - 1];
-        lastPoint.close = data.regularMarketPrice;
-      }
-      
-      validHistoricalData.forEach(point => {
-        const label = new Intl.DateTimeFormat(locale, dateOptions).format(point.dateObj);
-        rows.push([label, Number(point.close.toFixed(2))]);
-      });
+        // Processar dados históricos
+        const rows = [['Data', 'Preço']];
+        const locale = 'pt-BR';
+        const dateOptions = range === '1d' 
+          ? { hour: '2-digit', minute: '2-digit' } 
+          : { day: '2-digit', month: '2-digit' };
+        
+        // Filtrar e ordenar dados históricos
+        const validHistoricalData = data.historicalDataPrice
+          .filter(point => point && point.date && point.close !== null && point.close !== undefined)
+          .map(point => ({
+            ...point,
+            dateObj: new Date(point.date * 1000)
+          }))
+          .filter(point => !isNaN(point.dateObj.getTime()))
+          .sort((a, b) => a.dateObj - b.dateObj);
+        
+        // Se não há dados válidos após filtragem
+        if (validHistoricalData.length === 0) {
+          throw new Error('Histórico insuficiente.');
+        }
+        
+        // Garantir que o último ponto seja o valor atual consistente
+        if (Number.isFinite(data.regularMarketPrice) && data.regularMarketPrice > 0) {
+          // Sempre usar o preço atual mais recente como último ponto
+          validHistoricalData[validHistoricalData.length - 1].close = data.regularMarketPrice;
+        }
+        
+        // Formatar dados para o gráfico
+        validHistoricalData.forEach(point => {
+          const label = new Intl.DateTimeFormat(locale, dateOptions).format(point.dateObj);
+          rows.push([label, Number(point.close.toFixed(2))]);
+        });
 
-      if (rows.length <= 1) throw new Error('Histórico insuficiente');
+        // Verificar se temos dados suficientes após formatação
+        if (rows.length <= 1) {
+          throw new Error('Histórico insuficiente.');
+        }
 
-      setChartData(rows);
-      setStats({
-        currency: data.currency || 'BRL',
-        prevClose: data.regularMarketPreviousClose || rows[1]?.[1],
-        currentPrice: data.regularMarketPrice
-      });
+        setChartData(rows);
         setStats({
           currency: data.currency || 'BRL',
-          prevClose: data.regularMarketPreviousClose || rows[1][1]
+          prevClose: data.regularMarketPreviousClose || rows[1]?.[1] || 0,
+          currentPrice: data.regularMarketPrice
         });
       } catch (err) {
-        if (isMounted) setError(err.message);
+        console.error('Erro ao carregar dados do gráfico:', err);
+        if (isMounted) {
+          setError(err.message || 'Erro ao carregar dados do gráfico');
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
     };
 
-    if (symbol) loadData();
-    return () => { isMounted = false; };
+    if (symbol) {
+      loadData();
+    }
+    
+    return () => { 
+      isMounted = false; 
+    };
   }, [symbol, range]);
 
   const options = {
@@ -144,6 +158,9 @@ const StockChart = ({ symbol }) => {
         ) : error ? (
           <div className="chart-error">
             <span>⚠️ {error}</span>
+            <button className="retry-btn" onClick={() => window.location.reload()}>
+              Tentar novamente
+            </button>
           </div>
         ) : (
           <Chart
@@ -159,8 +176,8 @@ const StockChart = ({ symbol }) => {
 
       {stats && !loading && !error && (
         <div className="chart-footer">
-          <span className="prev-close">Fechamento anterior: {stats.currency} {stats.prevClose?.toFixed(2)}</span>
-          {stats.currentPrice && (
+          <span className="prev-close">Fechamento anterior: {stats.currency} {Number(stats.prevClose || 0).toFixed(2)}</span>
+          {Number.isFinite(stats.currentPrice) && stats.currentPrice > 0 && (
             <span className="current-price">Atual: {stats.currency} {stats.currentPrice.toFixed(2)}</span>
           )}
         </div>
