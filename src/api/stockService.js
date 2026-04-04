@@ -325,15 +325,21 @@ export const fetchChartData = async (symbol, range = '1mo', interval = '1d') => 
   try {
     return await tryFetch(apiSymbol);
   } catch (error) {
-    // Se BDR falhar e tem mapeamento, tentar ticker original
-    if (hasBdrMapping && apiSymbol !== originalSymbol) {
-      console.warn(`[stockService] Gráfico: BDR ${apiSymbol} falhou, tentando ticker original ${originalSymbol}`);
+    // Se for erro 404 e tem mapeamento BDR, tentar ticker original
+    if (error.response?.status === 404 && hasBdrMapping && apiSymbol !== originalSymbol) {
+      console.warn(`[stockService] Gráfico: BDR ${apiSymbol} não encontrado, tentando ticker original ${originalSymbol}`);
       try {
         return await tryFetch(originalSymbol);
       } catch (innerError) {
         console.error(`[stockService] Erro ao buscar dados de gráfico para ${symbol}:`, innerError.message);
         throw innerError;
       }
+    }
+    // Se for erro de limite (429), tentar próximo token se disponível
+    else if (error.response?.status === 429 && BRAPI_TOKENS.length > 1) {
+      console.warn(`[stockService] Limite atingido para ${apiSymbol}, tentando próximo token`);
+      currentTokenIndex = (currentTokenIndex + 1) % BRAPI_TOKENS.length;
+      return await fetchChartData(symbol, range, interval); // Tentar novamente com novo token
     }
     console.error(`[stockService] Erro ao buscar dados de gráfico para ${symbol}:`, error.message);
     throw error;

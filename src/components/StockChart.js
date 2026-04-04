@@ -62,7 +62,10 @@ const StockChart = ({ symbol }) => {
         // Garantir que o último ponto seja o valor atual consistente
         if (Number.isFinite(data.regularMarketPrice) && data.regularMarketPrice > 0) {
           // Sempre usar o preço atual mais recente como último ponto
-          validHistoricalData[validHistoricalData.length - 1].close = data.regularMarketPrice;
+          const lastPoint = validHistoricalData[validHistoricalData.length - 1];
+          if (lastPoint) {
+            lastPoint.close = data.regularMarketPrice;
+          }
         }
         
         // Formatar dados para o gráfico
@@ -85,7 +88,18 @@ const StockChart = ({ symbol }) => {
       } catch (err) {
         console.error('Erro ao carregar dados do gráfico:', err);
         if (isMounted) {
-          setError(err.message || 'Erro ao carregar dados do gráfico');
+          // Tratamento específico para erros 404 e outros erros de API
+          if (err.response?.status === 404) {
+            setError('Ativo não encontrado. Verifique o código do ticker.');
+          } else if (err.response?.status === 429) {
+            setError('Limite de requisições atingido. Aguarde alguns segundos e tente novamente.');
+          } else if (err.response?.status >= 500) {
+            setError('Erro no servidor. Tente novamente mais tarde.');
+          } else if (!navigator.onLine) {
+            setError('Sem conexão com a internet. Verifique sua conexão.');
+          } else {
+            setError(err.message || 'Erro ao carregar dados do gráfico');
+          }
         }
       } finally {
         if (isMounted) setLoading(false);
